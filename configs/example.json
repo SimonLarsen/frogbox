@@ -1,0 +1,57 @@
+{
+    "amp": true,
+    "batch_size": 32,
+    "loader_workers": 4,
+    "max_epochs": 32,
+    "model": {
+        "class": "models.example.ExampleModel",
+        "params": {
+            "scale_factor": 2,
+            "in_channels": 3,
+            "out_channels": 3,
+            "hidden_channels": 32,
+            "num_layers": 4,
+            "norm_groups": 4
+        }
+    },
+    "datasets": {
+        "train": {
+            "class": "datasets.example.ExampleDataset",
+            "params": {
+                "split": "train",
+                "do_normalize": true,
+                "do_augment": true
+            }
+        },
+        "val": {
+            "class": "datasets.example.ExampleDataset",
+            "params": {
+                "split": "val",
+                "do_normalize": true,
+                "do_augment": false
+            }
+        },
+        "test": {
+            "class": "datasets.example.ExampleDataset",
+            "params": {
+                "split": "test",
+                "do_normalize": true,
+                "do_augment": false
+            }
+        }
+    },
+    "optimizer": {
+        "class": "torch.optim.Adam",
+        "params": {
+            "lr": 1e-4
+        }
+    },
+    "lr_scheduler": {
+        "class": "ignite.handlers.param_scheduler.CosineAnnealingScheduler",
+        "params": {
+            "start_value": 1e-4,
+            "end_value": 1e-7,
+            "cycle_size": 32
+        }
+    }
+}

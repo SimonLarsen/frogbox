@@ -1,0 +1,5 @@
+torch>=2.0.1
+torchvision>=0.15.2
+pytorch-ignite>=0.4.12
+tqdm>=4.66.1
+wandb>=0.15.9
