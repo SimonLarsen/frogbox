@@ -11,6 +11,10 @@ from torchvision.transforms.functional import (
 from torchvision.utils import make_grid
 from ignite.engine import _prepare_batch
 from ignite.utils import convert_tensor
+from ignite.handlers import (
+    CosineAnnealingScheduler,
+    create_lr_scheduler_with_warmup,
+)
 from typing import (
     Any,
     Iterable,
@@ -31,7 +35,7 @@ def get_class(path: str) -> Any:
     Example
     -------
         cl = get_class("torch.optim.Adam)
-        optimizer = cl(parameters, lr=1e-5)
+        optimizer = cl(lr=1e-5)
     """
     parts = path.split(".")
     module_path = ".".join(parts[:-1])
@@ -56,15 +60,45 @@ def create_object_from_config(config: Dict[str, Any], **kwargs) -> Any:
     return obj_class(**params)
 
 
+def create_lr_scheduler_from_config(
+    optimizer: torch.optim.Optimizer,
+    config: Dict[str, Any],
+    max_iterations: int,
+) -> Any:
+    """
+    Create a learning rate scheduler from dictionary configuration.
+    """
+    if config["type"].lower() != "cosine":
+        raise ValueError(
+            f"Unsupported cosine annealing schedule '{config['type']}'."
+        )
+
+    lr_scheduler = CosineAnnealingScheduler(
+        optimizer=optimizer,
+        param_name="lr",
+        start_value=config["start_value"],
+        end_value=config["end_value"],
+        cycle_size=max_iterations,
+    )
+
+    warmup_steps = config.get("warmup_steps", 0)
+    if warmup_steps > 0:
+        lr_scheduler = create_lr_scheduler_with_warmup(
+            lr_scheduler=lr_scheduler,
+            warmup_start_value=0.0,
+            warmup_duration=warmup_steps,
+        )
+
+    return lr_scheduler
+
+
 def load_model_checkpoint(
-    path: Union[str, PathLike],
-    config_path: Optional[Union[str, PathLike]] = None,
+    path: Union[str, PathLike]
 ) -> Tuple[torch.nn.Module, Dict[str, Any]]:
     """Load model from checkpoint."""
     path = Path(path)
 
-    if config_path is None:
-        config_path = path.parent / "config.json"
+    config_path = path.parent / "config.json"
     with open(config_path, "r") as fp:
         config = json.load(fp)
 

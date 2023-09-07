@@ -43,13 +43,21 @@ class ExampleDataset(Dataset):
         return len(self.data)
 
     def normalize(self, x: torch.Tensor) -> torch.Tensor:
-        mean = torch.as_tensor(self.normalize_mean, dtype=x.dtype, device=x.device)
-        std = torch.as_tensor(self.normalize_std, dtype=x.dtype, device=x.device)
+        mean = torch.as_tensor(
+            self.normalize_mean, dtype=x.dtype, device=x.device
+        )
+        std = torch.as_tensor(
+            self.normalize_std, dtype=x.dtype, device=x.device
+        )
         return (x - mean) / std
 
     def denormalize(self, x: torch.Tensor) -> torch.Tensor:
-        mean = torch.as_tensor(self.normalize_mean, dtype=x.dtype, device=x.device)
-        std = torch.as_tensor(self.normalize_std, dtype=x.dtype, device=x.device)
+        mean = torch.as_tensor(
+            self.normalize_mean, dtype=x.dtype, device=x.device
+        )
+        std = torch.as_tensor(
+            self.normalize_std, dtype=x.dtype, device=x.device
+        )
         return (x * std) + mean
 
     def augment(self, x: torch.Tensor) -> torch.Tensor:

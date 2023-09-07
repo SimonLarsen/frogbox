@@ -14,6 +14,12 @@
             "norm_groups": 4
         }
     },
+    "losses": [
+        {
+            "weight": 1.0,
+            "class": "torch.nn.L1Loss"
+        }
+    ],
     "datasets": {
         "train": {
             "class": "datasets.example.ExampleDataset",
@@ -47,11 +53,9 @@
         }
     },
     "lr_scheduler": {
-        "class": "ignite.handlers.param_scheduler.CosineAnnealingScheduler",
-        "params": {
-            "start_value": 1e-4,
-            "end_value": 1e-7,
-            "cycle_size": 32
-        }
+        "type": "cosine",
+        "start_value": 1e-4,
+        "end_value": 1e-7,
+        "warmup_steps": 100
     }
 }

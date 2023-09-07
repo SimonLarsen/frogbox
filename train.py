@@ -1,4 +1,5 @@
 import os
+from math import ceil
 import json
 from pathlib import Path
 import argparse
@@ -10,13 +11,17 @@ from ignite.engine import (
     create_supervised_trainer,
     create_supervised_evaluator,
 )
-from ignite.metrics import Average, RunningAverage, SSIM, PSNR
-from ignite.handlers import global_step_from_engine
-from ignite.handlers.checkpoint import Checkpoint
+from ignite.metrics import SSIM, PSNR
+from ignite.handlers import global_step_from_engine, Checkpoint
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
 import wandb
-from utils import create_object_from_config, predict_test_images
+from utils import (
+    create_object_from_config,
+    create_lr_scheduler_from_config,
+    predict_test_images,
+)
+from losses.composite import CompositeLoss
 from typing import Optional, Sequence
 
 
@@ -47,6 +52,7 @@ amp = config.get("amp", False)
 device = torch.device(args.device)
 batch_size = config["batch_size"]
 loader_workers = config.get("loader_workers", 0)
+max_epochs = config["max_epochs"]
 
 # Create data loaders
 datasets = {}
@@ -70,7 +76,13 @@ optimizer = create_object_from_config(
 )
 
 # Create loss function
-loss_fn = torch.nn.L1Loss()
+loss_modules = []
+loss_weights = []
+for loss_conf in config["losses"]:
+    loss_modules.append(create_object_from_config(loss_conf))
+    loss_weights.append(loss_conf["weight"])
+
+loss_fn = CompositeLoss(loss_modules, loss_weights).to(device)
 
 # Create trainer
 trainer = create_supervised_trainer(
@@ -81,19 +93,16 @@ trainer = create_supervised_trainer(
     amp_mode="amp" if amp else None,
     scaler=amp,
 )
-Average().attach(trainer, "loss")
-RunningAverage(alpha=0.5, output_transform=lambda x: x).attach(
-    trainer, "running_avg_loss"
-)
-ProgressBar(desc="Train", ncols=80).attach(trainer, ["running_avg_loss"])
+ProgressBar(desc="Train", ncols=80).attach(trainer)
 
 # Create learning rate scheduler
-lr_scheduler = create_object_from_config(
-    config=config["lr_scheduler"],
+max_iterations = ceil(len(datasets["train"]) / batch_size * max_epochs)
+lr_scheduler = create_lr_scheduler_from_config(
     optimizer=optimizer,
-    param_name="lr",
+    config=config["lr_scheduler"],
+    max_iterations=max_iterations,
 )
-trainer.add_event_handler(Events.EPOCH_STARTED, lr_scheduler)
+trainer.add_event_handler(Events.ITERATION_STARTED, lr_scheduler)
 
 
 # Create evaluator
@@ -116,18 +125,26 @@ evaluator = create_supervised_evaluator(
 ProgressBar(desc="Val", ncols=80).attach(evaluator)
 
 # Set up logging
+num_params = sum(p.numel() for p in model.parameters())
 wandb_logger = WandBLogger(
     mode=args.wandb_mode,
     project="example-project",
-    config=dict(config=config),
+    config=dict(config=config, num_params=num_params),
 )
 run_name = wandb_logger.run.name
 
 wandb_logger.attach_output_handler(
     engine=trainer,
-    event_name=Events.EPOCH_COMPLETED,
+    event_name=Events.ITERATION_COMPLETED,
     tag="train",
-    metric_names=["loss"],
+    output_transform=lambda loss: {"loss": loss},
+)
+
+wandb_logger.attach_opt_params_handler(
+    engine=trainer,
+    event_name=Events.ITERATION_COMPLETED,
+    optimizer=optimizer,
+    param_name="lr",
 )
 
 wandb_logger.attach_output_handler(
@@ -135,14 +152,9 @@ wandb_logger.attach_output_handler(
     event_name=Events.COMPLETED,
     tag="val",
     metric_names="all",
-    global_step_transform=global_step_from_engine(trainer),
-)
-
-wandb_logger.attach_opt_params_handler(
-    engine=trainer,
-    event_name=Events.EPOCH_COMPLETED,
-    optimizer=optimizer,
-    param_name="lr",
+    global_step_transform=global_step_from_engine(
+        trainer, Events.ITERATION_COMPLETED
+    ),
 )
 
 
@@ -167,7 +179,7 @@ def log_test_images(trainer):
     )
 
     images = [wandb.Image(to_pil_image(image)) for image in images]
-    wandb.log(step=trainer.state.epoch, data={"test/images": images})
+    wandb.log(step=trainer.state.iteration, data={"test/images": images})
 
 
 # Set up checkpoints
@@ -195,9 +207,5 @@ with open(f"checkpoints/{run_name}/config.json", "w") as fp:
 if args.checkpoint:
     Checkpoint.load_objects(to_load=to_save, checkpoint=args.checkpoint)
 
-trainer.run(
-    loaders["train"],
-    max_epochs=config["max_epochs"],
-    epoch_length=config.get("epoch_length"),
-)
+trainer.run(loaders["train"], max_epochs=max_epochs)
 wandb_logger.close()
