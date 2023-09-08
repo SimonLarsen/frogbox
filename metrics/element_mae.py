@@ -22,5 +22,8 @@ class ElementMeanAbsoluteError(Metric):
     @sync_all_reduce("_sum_of_absolute_errors", "_num_examples")
     def compute(self) -> Union[float, torch.Tensor]:
         if self._num_examples == 0:
-            raise NotComputableError("MeanAbsoluteError must have at least one example before it can be computed.")
+            raise NotComputableError(
+                "ElementMeanAbsoluteError must have at least one example"
+                " before it can be computed."
+            )
         return self._sum_of_absolute_errors.item() / self._num_examples
