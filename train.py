@@ -12,9 +12,8 @@ from ignite.engine import (
     create_supervised_evaluator,
 )
 from ignite.metrics import SSIM, PSNR
-from ignite.handlers import global_step_from_engine, Checkpoint
-from ignite.contrib.handlers.tqdm_logger import ProgressBar
-from ignite.contrib.handlers.wandb_logger import WandBLogger
+from ignite.handlers import global_step_from_engine, Checkpoint, TerminateOnNan
+from ignite.contrib.handlers import ProgressBar, WandBLogger
 import wandb
 from utils import (
     create_object_from_config,
@@ -103,6 +102,7 @@ lr_scheduler = create_lr_scheduler_from_config(
     max_iterations=max_iterations,
 )
 trainer.add_event_handler(Events.ITERATION_STARTED, lr_scheduler)
+trainer.add_event_handler(Events.ITERATION_COMPLETED, TerminateOnNan())
 
 
 # Create evaluator
@@ -159,7 +159,7 @@ wandb_logger.attach_output_handler(
 
 
 @trainer.on(Events.EPOCH_COMPLETED)
-def log_validation(trainer):
+def log_validation():
     evaluator.run(loaders["val"])
 
 
