@@ -8,7 +8,6 @@ from torch.utils.data import DataLoader
 from torchvision.transforms.functional import to_pil_image
 from ignite.engine import (
     Events,
-    create_supervised_trainer,
     create_supervised_evaluator,
 )
 from ignite.metrics import SSIM, PSNR
@@ -20,6 +19,7 @@ from utils import (
     create_lr_scheduler_from_config,
     predict_test_images,
 )
+from engines.supervised import create_supervised_trainer
 from losses.composite import CompositeLoss
 from metrics.element_mae import ElementMeanAbsoluteError
 from typing import Optional, Sequence
@@ -53,6 +53,7 @@ device = torch.device(args.device)
 batch_size = config["batch_size"]
 loader_workers = config.get("loader_workers", 0)
 max_epochs = config["max_epochs"]
+clip_grad_norm = config.get("clip_grad_norm", None)
 
 # Create data loaders
 datasets = {}
@@ -90,8 +91,9 @@ trainer = create_supervised_trainer(
     optimizer=optimizer,
     loss_fn=loss_fn,
     device=device,
-    amp_mode="amp" if amp else None,
+    amp=amp,
     scaler=amp,
+    clip_grad_norm=clip_grad_norm,
 )
 ProgressBar(desc="Train", ncols=80).attach(trainer)
 
