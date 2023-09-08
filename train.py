@@ -21,6 +21,7 @@ from utils import (
     predict_test_images,
 )
 from losses.composite import CompositeLoss
+from metrics.element_mae import ElementMeanAbsoluteError
 from typing import Optional, Sequence
 
 
@@ -113,6 +114,7 @@ def fix_metric_dtypes(data):
 
 
 metrics = {
+    "mae": ElementMeanAbsoluteError(output_transform=fix_metric_dtypes),
     "ssim": SSIM(data_range=1.0, output_transform=fix_metric_dtypes),
     "psnr": PSNR(data_range=1.0, output_transform=fix_metric_dtypes),
 }
