@@ -86,6 +86,7 @@ def create_lr_scheduler_from_config(
         lr_scheduler = create_lr_scheduler_with_warmup(
             lr_scheduler=lr_scheduler,
             warmup_start_value=0.0,
+            warmup_end_value=config["start_value"],
             warmup_duration=warmup_steps,
         )
 
