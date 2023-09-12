@@ -61,7 +61,7 @@ def create_supervised_trainer(
     device_type = device.type if isinstance(device, torch.device) else device
     if "xla" in device_type:
         raise ValueError("TPU not supported in trainer.")
-    if amp and isinstance(scaler, bool):
+    if amp and isinstance(scaler, bool) and scaler:
         scaler = torch.cuda.amp.GradScaler(enabled=True)
 
     def _update(
