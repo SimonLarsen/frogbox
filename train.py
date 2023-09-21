@@ -162,6 +162,13 @@ wandb_logger.attach_output_handler(
 )
 
 
+@trainer.on(Events.ITERATION_COMPLETED)
+def log_losses(trainer):
+    names = ["loss/" + l.get("name", l["class"]) for l in config["losses"]]
+    losses = dict(zip(names, loss_fn.last_values))
+    wandb.log(step=trainer.state.iteration, data=losses)
+
+
 @trainer.on(Events.EPOCH_COMPLETED)
 def log_validation():
     evaluator.run(loaders["val"])

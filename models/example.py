@@ -1,3 +1,4 @@
+import math
 from torch import nn
 
 
@@ -58,6 +59,7 @@ class ExampleModel(nn.Module):
         hidden_channels: int = 32,
         num_layers: int = 4,
         norm_groups: int = 4,
+        activation="gelu",
     ):
         super().__init__()
 
@@ -69,26 +71,30 @@ class ExampleModel(nn.Module):
                 ResidualBlock(
                     channels=hidden_channels,
                     norm_groups=norm_groups,
-                    activation="relu",
+                    activation=activation,
                 )
             )
+        features.append(nn.Conv2d(hidden_channels, hidden_channels, 3, 1, 1))
         self.features = nn.Sequential(*features)
 
-        self.proj_upsample = nn.Conv2d(
-            hidden_channels, out_channels * scale_factor**2, 3, 1, 1
-        )
-        self.upsample = nn.PixelShuffle(scale_factor)
+        upsample = []
+        for _ in range(int(math.log2(scale_factor))):
+            upsample.append(nn.Upsample(scale_factor=2, mode="nearest"))
+            upsample.append(
+                nn.Conv2d(hidden_channels, hidden_channels, 3, 1, 1)
+            )
+            upsample.append(get_activation(activation))
+        self.upsample = nn.Sequential(*upsample)
 
-        self.readout = nn.Sequential(
-            nn.BatchNorm2d(out_channels),
-            nn.BatchNorm2d(out_channels),
-            nn.Conv2d(out_channels, out_channels, 3, 1, 1),
+        self.conv_out = nn.Sequential(
+            nn.Conv2d(hidden_channels, hidden_channels, 3, 1, 1),
+            get_activation(activation),
+            nn.Conv2d(hidden_channels, out_channels, 3, 1, 1),
         )
 
     def forward(self, x):
         x = self.conv_in(x)
         x = self.features(x)
-        x = self.proj_upsample(x)
         x = self.upsample(x)
-        x = self.readout(x)
+        x = self.conv_out(x)
         return x
