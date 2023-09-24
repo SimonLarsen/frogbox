@@ -70,7 +70,7 @@ def create_lr_scheduler_from_config(
     """
     if config["type"].lower() != "cosine":
         raise ValueError(
-            f"Unsupported cosine annealing schedule '{config['type']}'."
+            f"Unsupported annealing schedule '{config['type']}'."
         )
 
     lr_scheduler = CosineAnnealingScheduler(
