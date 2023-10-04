@@ -115,6 +115,7 @@ def predict_test_images(
     device: torch.device,
     prepare_batch: Callable = _prepare_batch,
     input_transform: Callable[[Any], Any] = lambda x: x,
+    model_transform: Callable[[Any], Any] = lambda y_pred: y_pred,
     output_transform: Callable[[Any, Any, Any], Any] = (
         lambda x, y, y_pred: [x, y_pred, y]
     ),
@@ -135,7 +136,7 @@ def predict_test_images(
             with torch.autocast(
                 device_type=device.type, enabled=amp_mode == "amp"
             ):
-                y_pred = model(x)
+                y_pred = model_transform(model(x))
 
         y_pred = y_pred.type(y.dtype)
         x, y, y_pred = convert_tensor(
