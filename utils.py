@@ -9,7 +9,7 @@ from torchvision.transforms.functional import (
     InterpolationMode,
 )
 from torchvision.utils import make_grid
-from ignite.engine import _prepare_batch
+from ignite.engine import Events, _prepare_batch
 from ignite.utils import convert_tensor
 from ignite.handlers import (
     CosineAnnealingScheduler,
@@ -44,6 +44,25 @@ def get_class(path: str) -> Any:
     return getattr(module, class_name)
 
 
+def parse_log_interval(s: Union[str, Dict[str, Any]]) -> Events:
+    """
+    Create ignite event from string or dictionary configuration.
+    Dictionary must have a ``event`` entry.
+
+    Example
+    -------
+        log_interval = {"event": "ITERATION_COMPLETED", "every": 100}
+        event = parse_log_interval(log_interval)
+    """
+    if isinstance(s, str):
+        return Events[s]
+    config = dict(s)
+    event = Events[config.pop("event")]
+    if len(config) > 0:
+        event = event(**config)
+    return event
+
+
 def create_object_from_config(config: Dict[str, Any], **kwargs) -> Any:
     """
     Create object from dictionary configuration.
@@ -69,9 +88,7 @@ def create_lr_scheduler_from_config(
     Create a learning rate scheduler from dictionary configuration.
     """
     if config["type"].lower() != "cosine":
-        raise ValueError(
-            f"Unsupported annealing schedule '{config['type']}'."
-        )
+        raise ValueError(f"Unsupported annealing schedule '{config['type']}'.")
 
     lr_scheduler = CosineAnnealingScheduler(
         optimizer=optimizer,

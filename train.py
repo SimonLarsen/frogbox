@@ -17,6 +17,7 @@ import wandb
 from utils import (
     create_object_from_config,
     create_lr_scheduler_from_config,
+    parse_log_interval,
     predict_test_images,
 )
 from engines.supervised import create_supervised_trainer
@@ -48,12 +49,16 @@ args = parse_arguments()
 with open(args.config, "r") as fp:
     config = json.load(fp)
 
+project = config.get("project", Path(__file__).parent.name)
 amp = config.get("amp", False)
 device = torch.device(args.device)
 batch_size = config["batch_size"]
 loader_workers = config.get("loader_workers", 0)
 max_epochs = config["max_epochs"]
 clip_grad_norm = config.get("clip_grad_norm", None)
+log_interval = Events.EPOCH_COMPLETED
+if "log_interval" in config:
+    log_interval = parse_log_interval(config["log_interval"])
 
 # Create data loaders
 datasets = {}
@@ -132,7 +137,7 @@ ProgressBar(desc="Val", ncols=80).attach(evaluator)
 num_params = sum(p.numel() for p in model.parameters())
 wandb_logger = WandBLogger(
     mode=args.wandb_mode,
-    project="example-project",
+    project=project,
     config=dict(config=config, num_params=num_params),
 )
 run_name = wandb_logger.run.name
@@ -169,12 +174,12 @@ def log_losses(trainer):
     wandb.log(step=trainer.state.iteration, data=losses)
 
 
-@trainer.on(Events.EPOCH_COMPLETED)
+@trainer.on(log_interval)
 def log_validation():
     evaluator.run(loaders["val"])
 
 
-@trainer.on(Events.EPOCH_COMPLETED)
+@trainer.on(log_interval)
 def log_test_images(trainer):
     def output_transform(x, y, y_pred):
         if datasets["test"].do_normalize:

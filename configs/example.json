@@ -1,8 +1,13 @@
 {
+    "project": "example-project",
     "amp": true,
     "batch_size": 32,
     "loader_workers": 4,
     "max_epochs": 32,
+    "log_interval": {
+        "event": "EPOCH_COMPLETED",
+        "every": 1
+    },
     "model": {
         "class": "models.example.ExampleModel",
         "params": {
