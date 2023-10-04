@@ -15,6 +15,7 @@ from ignite.handlers import (
     CosineAnnealingScheduler,
     create_lr_scheduler_with_warmup,
 )
+import jinja2
 from typing import (
     Any,
     Iterable,
@@ -28,20 +29,17 @@ from typing import (
 )
 
 
-def get_class(path: str) -> Any:
+def read_json_config(
+    path: Union[str, PathLike],
+    config_dir: Union[str, PathLike] = "configs",
+) -> Dict[str, Any]:
     """
-    Get class from import path.
-
-    Example
-    -------
-        cl = get_class("torch.optim.Adam)
-        optimizer = cl(lr=1e-5)
+    Read and render JSON config file and render using jinja2.
     """
-    parts = path.split(".")
-    module_path = ".".join(parts[:-1])
-    class_name = parts[-1]
-    module = import_module(module_path)
-    return getattr(module, class_name)
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(config_dir)))
+    template = env.get_template(str(path))
+    config = json.loads(template.render())
+    return config
 
 
 def parse_log_interval(s: Union[str, Dict[str, Any]]) -> Events:
@@ -61,6 +59,22 @@ def parse_log_interval(s: Union[str, Dict[str, Any]]) -> Events:
     if len(config) > 0:
         event = event(**config)
     return event
+
+
+def get_class(path: str) -> Any:
+    """
+    Get class from import path.
+
+    Example
+    -------
+        cl = get_class("torch.optim.Adam)
+        optimizer = cl(lr=1e-5)
+    """
+    parts = path.split(".")
+    module_path = ".".join(parts[:-1])
+    class_name = parts[-1]
+    module = import_module(module_path)
+    return getattr(module, class_name)
 
 
 def create_object_from_config(config: Dict[str, Any], **kwargs) -> Any:

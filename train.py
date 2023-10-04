@@ -15,6 +15,7 @@ from ignite.handlers import global_step_from_engine, Checkpoint, TerminateOnNan
 from ignite.contrib.handlers import ProgressBar, WandBLogger
 import wandb
 from utils import (
+    read_json_config,
     create_object_from_config,
     create_lr_scheduler_from_config,
     parse_log_interval,
@@ -46,9 +47,8 @@ def parse_arguments(
 
 args = parse_arguments()
 
-with open(args.config, "r") as fp:
-    config = json.load(fp)
-
+# Parse config
+config = read_json_config(args.config)
 project = config.get("project", Path(__file__).parent.name)
 amp = config.get("amp", False)
 device = torch.device(args.device)
