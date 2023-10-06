@@ -29,15 +29,13 @@ from typing import (
 )
 
 
-def read_json_config(
-    path: Union[str, PathLike],
-    config_dir: Union[str, PathLike] = "configs",
-) -> Dict[str, Any]:
+def read_json_config(path: Union[str, PathLike]) -> Dict[str, Any]:
     """
     Read and render JSON config file and render using jinja2.
     """
+    config_dir = Path(path).parent
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(config_dir)))
-    template = env.get_template(str(path))
+    template = env.get_template(str(path.relative_to(config_dir)))
     config = json.loads(template.render())
     return config
 

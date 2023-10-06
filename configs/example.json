@@ -4,6 +4,7 @@
     "batch_size": 32,
     "loader_workers": 4,
     "max_epochs": 32,
+    "checkpoint_metric": "PSNR",
     "log_interval": {
         "event": "EPOCH_COMPLETED",
         "every": 1
@@ -19,13 +20,26 @@
             "norm_groups": 4
         }
     },
-    "losses": [
-        {
-            "name": "L1",
+    "losses": {
+        "L1": {
             "weight": 1.0,
             "class": "torch.nn.L1Loss"
+        },
+        "MSE": {
+            "weight": 1.0,
+            "class": "torch.nn.MSELoss"
         }
-    ],
+    },
+    "metrics": {
+        "PSNR": {
+            "class": "ignite.metrics.SSIM",
+            "params": {"data_range": 1.0}
+        },
+        "SSIM": {
+            "class": "ignite.metrics.PSNR",
+            "params": {"data_range": 1.0}
+        }
+    },
     "datasets": {% include 'datasets.json' %},
     "optimizer": {
         "class": "torch.optim.Adam",
