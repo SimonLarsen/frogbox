@@ -36,7 +36,7 @@ def parse_arguments(
     )
     parser.add_argument("-d", "--device", type=str, default="cuda:0")
     parser.add_argument(
-        "--wandb-mode",
+        "--logging",
         type=str,
         choices=["online", "offline", "disabled"],
         default="online",
@@ -134,13 +134,14 @@ evaluator = create_supervised_evaluator(
 ProgressBar(desc="Val", ncols=80).attach(evaluator)
 
 # Set up logging
-num_params = sum(p.numel() for p in model.parameters())
 wandb_logger = WandBLogger(
-    mode=args.wandb_mode,
+    mode=args.logging,
     project=project,
-    config=dict(config=config, num_params=num_params),
+    config=dict(
+        config=config,
+        num_params=sum(p.numel() for p in model.parameters()),
+    ),
 )
-run_name = wandb_logger.run.name
 
 wandb_logger.attach_output_handler(
     engine=trainer,
@@ -205,19 +206,27 @@ to_save = {
     "trainer": trainer,
     "lr_scheduler": lr_scheduler,
 }
-checkpoint_handler = Checkpoint(
-    to_save=to_save,
-    save_handler=f"checkpoints/{run_name}",
-    filename_prefix="best",
-    score_name="psnr",
-    n_saved=3,
-    global_step_transform=global_step_from_engine(trainer),
-)
-evaluator.add_event_handler(Events.COMPLETED, checkpoint_handler)
 
-os.makedirs(f"checkpoints/{run_name}", exist_ok=True)
-with open(f"checkpoints/{run_name}/config.json", "w") as fp:
-    json.dump(config, fp, indent=2)
+if args.logging != "disabled":
+    run_name = (
+        wandb_logger.run.name
+        if args.logging == "online"
+        else f"offline-{wandb_logger.run.id}"
+    )
+
+    checkpoint_handler = Checkpoint(
+        to_save=to_save,
+        save_handler=f"checkpoints/{run_name}",
+        filename_prefix="best",
+        score_name="psnr",
+        n_saved=3,
+        global_step_transform=global_step_from_engine(trainer),
+    )
+    evaluator.add_event_handler(Events.COMPLETED, checkpoint_handler)
+
+    os.makedirs(f"checkpoints/{run_name}", exist_ok=True)
+    with open(f"checkpoints/{run_name}/config.json", "w") as fp:
+        json.dump(config, fp, indent=2)
 
 # Start training
 if args.checkpoint:
