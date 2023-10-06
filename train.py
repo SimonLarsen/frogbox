@@ -13,7 +13,9 @@ def parse_arguments(
     parser.add_argument(
         "-c", "--config", type=Path, default="configs/example.json"
     )
-    parser.add_argument("-d", "--device", type=str, default="cuda:0")
+    parser.add_argument(
+        "-d", "--device", type=torch.device, default=torch.device("cuda:0")
+    )
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument(
         "--logging",
@@ -28,11 +30,10 @@ if __name__ == "__main__":
     args = parse_arguments()
 
     config = read_json_config(args.config)
-    device = torch.device(args.device)
 
     train(
         config=config,
-        device=device,
+        device=args.device,
         checkpoint=args.checkpoint,
         logging=args.logging,
     )
