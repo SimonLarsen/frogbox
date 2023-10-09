@@ -2,8 +2,7 @@ from typing import Optional, Sequence
 from pathlib import Path
 import argparse
 import torch
-from utils import read_json_config
-from pipelines.supervised import train
+from trainer import read_json_config, train_supervised
 
 
 def parse_arguments(
@@ -31,7 +30,7 @@ if __name__ == "__main__":
 
     config = read_json_config(args.config)
 
-    train(
+    train_supervised(
         config=config,
         device=args.device,
         checkpoint=args.checkpoint,

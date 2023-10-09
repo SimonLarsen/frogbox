@@ -14,14 +14,10 @@ from ignite.engine import (
 from ignite.handlers import global_step_from_engine, Checkpoint, TerminateOnNan
 from ignite.contrib.handlers import ProgressBar, WandBLogger
 import wandb
-from utils import (
-    parse_log_interval,
-    create_object_from_config,
-    create_lr_scheduler_from_config,
-    predict_test_images,
-)
-from engines.supervised import create_supervised_trainer
-from losses.composite import CompositeLoss
+from ..config import create_object_from_config, parse_log_interval, create_lr_scheduler_from_config
+from ..utils import predict_test_images
+from ..engines.supervised import create_supervised_trainer
+from ..losses.composite import CompositeLoss
 
 
 def _fix_metric_dtypes(data):
@@ -33,7 +29,7 @@ def _fix_metric_dtypes(data):
     return y_pred, y
 
 
-def train(
+def train_supervised(
     config: Dict[str, Any],
     device: Union[str, torch.device],
     checkpoint: Union[str, PathLike] = None,
