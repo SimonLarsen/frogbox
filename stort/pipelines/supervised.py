@@ -1,4 +1,4 @@
-from typing import Dict, Any, Union, Callable
+from typing import Optional, Any, Union, Callable
 from os import PathLike
 import os
 from math import ceil
@@ -14,7 +14,12 @@ from ignite.engine import (
 from ignite.handlers import global_step_from_engine, Checkpoint, TerminateOnNan
 from ignite.contrib.handlers import ProgressBar, WandBLogger
 import wandb
-from ..config import create_object_from_config, parse_log_interval, create_lr_scheduler_from_config
+from ..config import (
+    create_object_from_config,
+    parse_log_interval,
+    create_lr_scheduler_from_config,
+)
+from ..config import Config
 from ..utils import predict_test_images
 from ..engines.supervised import create_supervised_trainer
 from ..losses.composite import CompositeLoss
@@ -30,9 +35,9 @@ def _fix_metric_dtypes(data):
 
 
 def train_supervised(
-    config: Dict[str, Any],
+    config: Config,
     device: Union[str, torch.device],
-    checkpoint: Union[str, PathLike] = None,
+    checkpoint: Optional[Union[str, PathLike]] = None,
     logging: str = "online",
     prepare_batch: Callable = _prepare_batch,
     trainer_model_transform: Callable[[Any], Any] = lambda output: output,
@@ -106,7 +111,9 @@ def train_supervised(
     ProgressBar(desc="Train", ncols=80).attach(trainer)
 
     # Create learning rate scheduler
-    max_iterations = ceil(len(datasets["train"]) / config.batch_size * config.max_epochs)
+    max_iterations = ceil(
+        len(datasets["train"]) / config.batch_size * config.max_epochs
+    )
     lr_scheduler = create_lr_scheduler_from_config(
         optimizer=optimizer,
         config=config.lr_scheduler,
@@ -163,7 +170,7 @@ def train_supervised(
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_losses(trainer):
-        labels = ["loss/" + l for l in loss_fn.labels]
+        labels = ["loss/" + label for label in loss_fn.labels]
         losses = dict(zip(labels, loss_fn.last_values))
         wandb.log(step=trainer.state.iteration, data=losses)
 
@@ -221,7 +228,7 @@ def train_supervised(
 
     # Start training
     if checkpoint:
-        Checkpoint.load_objects(to_load=to_save, checkpoint=checkpoint)
+        Checkpoint.load_objects(to_load=to_save, checkpoint=str(checkpoint))
 
     trainer.run(loaders["train"], max_epochs=config.max_epochs)
     wandb_logger.close()

@@ -7,11 +7,10 @@ from typing import (
     List,
     Union,
     Tuple,
-    Dict
+    Dict,
 )
 from os import PathLike
 from pathlib import Path
-import json
 import torch
 from torchvision.transforms.functional import (
     resize,
@@ -21,12 +20,12 @@ from torchvision.transforms.functional import (
 from torchvision.utils import make_grid
 from ignite.engine import _prepare_batch
 from ignite.utils import convert_tensor
-from .config import read_json_config, create_object_from_config
+from .config import Config, read_json_config, create_object_from_config
 
 
 def load_model_checkpoint(
     path: Union[str, PathLike]
-) -> Tuple[torch.nn.Module, Dict[str, Any]]:
+) -> Tuple[torch.nn.Module, Config]:
     """
     Load model from checkpoint.
 
@@ -34,7 +33,7 @@ def load_model_checkpoint(
     ----------
     path : path-like
         Path to checkpoint file.
-    
+
     Returns
     -------
     A tuple (model, config).
@@ -63,7 +62,7 @@ def predict_test_images(
     resize_to_fit: bool = True,
     interpolation: InterpolationMode = InterpolationMode.NEAREST,
     antialias: bool = True,
-    num_cols: int = None,
+    num_cols: Optional[int] = None,
     amp_mode: Optional[str] = None,
     non_blocking: bool = False,
 ) -> List[torch.Tensor]:
@@ -107,7 +106,7 @@ def _combine_test_images(
     resize_to_fit: bool = True,
     interpolation: InterpolationMode = InterpolationMode.NEAREST,
     antialias: bool = True,
-    num_cols: int = None,
+    num_cols: Optional[int] = None,
 ) -> torch.Tensor:
     for image in images:
         assert len(image.shape) == 3

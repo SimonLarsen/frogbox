@@ -9,7 +9,7 @@ def create_supervised_trainer(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     loss_fn: Union[Callable, torch.nn.Module],
-    device: Optional[Union[str, torch.device]] = None,
+    device: Union[str, torch.device] = "cpu",
     non_blocking: bool = False,
     prepare_batch: Callable = _prepare_batch,
     model_transform: Callable[[Any], Any] = lambda output: output,
@@ -27,7 +27,8 @@ def create_supervised_trainer(
 
     Similar to ignite.engine.create_supervised_trainer except:
     1. Gradient clipping is added through the ``clip_grad_norm`` argument.
-    2. TPU and APEX is not currently supported. AMP is enabled with the ``amp`` argument.
+    2. TPU and APEX is not currently supported.
+       AMP is enabled with the ``amp`` argument.
 
     Arguments
     ---------
@@ -35,7 +36,7 @@ def create_supervised_trainer(
     optimizer: the optimizer to use.
     loss_fn: the loss function to use.
     device: device type specification (default: None).
-        Applies to batches after starting the engine. Model *will not* be moved.
+        Applies to batches after starting the engine. Model will not be moved.
         Device can be CPU, GPU or TPU.
     non_blocking: if True and this copy is between CPU and GPU, the copy may
         occur asynchronously with respect to the host. For other cases,
@@ -58,6 +59,7 @@ def create_supervised_trainer(
     -------
     a trainer engine with supervised update function.
     """
+    device = torch.device(device)
     device_type = device.type if isinstance(device, torch.device) else device
     if "xla" in device_type:
         raise ValueError("TPU not supported in trainer.")

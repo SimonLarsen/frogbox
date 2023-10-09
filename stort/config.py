@@ -1,19 +1,26 @@
 from typing import Union, Dict, Any, Optional
 from os import PathLike
+from enum import Enum
 from pathlib import Path
 from importlib import import_module
 import jinja2
 import torch
 from pydantic import BaseModel
-from ignite.engine import Events
+from ignite.engine import Events, CallableEventWithFilter
 from ignite.handlers import (
     CosineAnnealingScheduler,
     create_lr_scheduler_with_warmup,
 )
 
 
+class LogEvent(str, Enum):
+    EPOCH_COMPLETED = "EPOCH_COMPLETED"
+    ITERATION_COMPLETED = "ITERATION_COMPLETED"
+    COMPLETED = "COMPLETED"
+
+
 class LogInterval(BaseModel):
-    event: str
+    event: LogEvent
     every: int = 1
 
 
@@ -26,8 +33,12 @@ class LossDefinition(ObjectDefinition):
     weight: float
 
 
+class SchedulerType(str, Enum):
+    COSINE = "cosine"
+
+
 class LRSchedulerDefinition(BaseModel):
-    type: str = "cosine"
+    type: SchedulerType
     start_value: float = 1e-4
     end_value: float = 1e-7
     warmup_steps: int = 0
@@ -41,7 +52,9 @@ class Config(BaseModel):
     loader_workers: int = 0
     max_epochs: int = 32
     checkpoint_metric: str
-    log_interval: Union[str, LogInterval] = LogInterval(event="EPOCH_COMPLETED", every=1)
+    log_interval: Union[str, LogInterval] = LogInterval(
+        event=LogEvent.EPOCH_COMPLETED, every=1
+    )
     model: ObjectDefinition
     losses: Dict[str, LossDefinition]
     metrics: Dict[str, ObjectDefinition]
@@ -50,7 +63,7 @@ class Config(BaseModel):
     lr_scheduler: LRSchedulerDefinition
 
 
-def read_json_config(path: Union[str, PathLike]) -> Dict[str, Any]:
+def read_json_config(path: Union[str, PathLike]) -> Config:
     """
     Read and render JSON config file and render using jinja2.
     """
@@ -61,7 +74,9 @@ def read_json_config(path: Union[str, PathLike]) -> Dict[str, Any]:
     return config
 
 
-def parse_log_interval(s: Union[str, LogInterval]) -> Events:
+def parse_log_interval(
+    s: Union[str, LogInterval]
+) -> Union[Events, CallableEventWithFilter]:
     """
     Create ignite event from string or dictionary configuration.
     Dictionary must have a ``event`` entry.
@@ -79,10 +94,10 @@ def parse_log_interval(s: Union[str, LogInterval]) -> Events:
             del config[k]
 
     event_name = config.pop("event")
-    event = Events[event_name]
+    event = Events[event_name.value]
 
     if len(config) > 0:
-        event = event(**config)
+        return event(**config)
     return event
 
 
