@@ -7,7 +7,6 @@ from typing import (
     List,
     Union,
     Tuple,
-    Dict,
 )
 from os import PathLike
 from pathlib import Path
