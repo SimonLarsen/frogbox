@@ -47,33 +47,26 @@ def train_supervised(
     device = torch.device(device)
 
     # Parse config file
-    amp = config.get("amp", False)
-    batch_size = config["batch_size"]
-    loader_workers = config.get("loader_workers", 0)
-    max_epochs = config["max_epochs"]
-    clip_grad_norm = config.get("clip_grad_norm", None)
-    log_interval = Events.EPOCH_COMPLETED
-    if "log_interval" in config:
-        log_interval = parse_log_interval(config["log_interval"])
+    log_interval = parse_log_interval(config.log_interval)
 
     # Create data loaders
     datasets = {}
     loaders = {}
-    for split, ds_conf in config["datasets"].items():
+    for split, ds_conf in config.datasets.items():
         ds = create_object_from_config(ds_conf)
         datasets[split] = ds
         loaders[split] = DataLoader(
             dataset=ds,
-            batch_size=batch_size,
-            num_workers=loader_workers,
+            batch_size=config.batch_size,
+            num_workers=config.loader_workers,
             shuffle=split == "train",
         )
 
     # Create model
-    model = create_object_from_config(config["model"])
+    model = create_object_from_config(config.model)
     model = model.to(device)
     optimizer = create_object_from_config(
-        config=config["optimizer"],
+        config=config.optimizer,
         params=model.parameters(),
     )
 
@@ -81,16 +74,16 @@ def train_supervised(
     loss_labels = []
     loss_modules = []
     loss_weights = []
-    for loss_label, loss_conf in config["losses"].items():
+    for loss_label, loss_conf in config.losses.items():
         loss_labels.append(loss_label)
         loss_modules.append(create_object_from_config(loss_conf))
-        loss_weights.append(loss_conf["weight"])
+        loss_weights.append(loss_conf.weight)
 
     loss_fn = CompositeLoss(loss_labels, loss_modules, loss_weights).to(device)
 
     # Create metrics
     metrics = {}
-    for metric_label, metric_conf in config["metrics"].items():
+    for metric_label, metric_conf in config.metrics.items():
         metric = create_object_from_config(
             config=metric_conf,
             output_transform=_fix_metric_dtypes,
@@ -103,9 +96,9 @@ def train_supervised(
         optimizer=optimizer,
         loss_fn=loss_fn,
         device=device,
-        amp=amp,
-        scaler=amp,
-        clip_grad_norm=clip_grad_norm,
+        amp=config.amp,
+        scaler=config.amp,
+        clip_grad_norm=config.clip_grad_norm,
         prepare_batch=prepare_batch,
         model_transform=trainer_model_transform,
         output_transform=trainer_output_transform,
@@ -113,10 +106,10 @@ def train_supervised(
     ProgressBar(desc="Train", ncols=80).attach(trainer)
 
     # Create learning rate scheduler
-    max_iterations = ceil(len(datasets["train"]) / batch_size * max_epochs)
+    max_iterations = ceil(len(datasets["train"]) / config.batch_size * config.max_epochs)
     lr_scheduler = create_lr_scheduler_from_config(
         optimizer=optimizer,
-        config=config["lr_scheduler"],
+        config=config.lr_scheduler,
         max_iterations=max_iterations,
     )
     trainer.add_event_handler(Events.ITERATION_STARTED, lr_scheduler)
@@ -127,7 +120,7 @@ def train_supervised(
         model=model,
         metrics=metrics,
         device=device,
-        amp_mode="amp" if amp else None,
+        amp_mode="amp" if config.amp else None,
         prepare_batch=prepare_batch,
         model_transform=evaluator_model_transform,
         output_transform=evaluator_output_transform,
@@ -137,7 +130,7 @@ def train_supervised(
     # Set up logging
     wandb_logger = WandBLogger(
         mode=logging,
-        project=config["project"],
+        project=config.project,
         config=dict(
             config=config,
             num_params=sum(p.numel() for p in model.parameters()),
@@ -216,7 +209,7 @@ def train_supervised(
             to_save=to_save,
             save_handler=f"checkpoints/{run_name}",
             filename_prefix="best",
-            score_name=config["checkpoint_metric"],
+            score_name=config.checkpoint_metric,
             n_saved=3,
             global_step_transform=global_step_from_engine(trainer),
         )
@@ -224,11 +217,11 @@ def train_supervised(
 
         os.makedirs(f"checkpoints/{run_name}", exist_ok=True)
         with open(f"checkpoints/{run_name}/config.json", "w") as fp:
-            json.dump(config, fp, indent=2)
+            json.dump(config.model_dump(), fp, indent=2)
 
     # Start training
     if checkpoint:
         Checkpoint.load_objects(to_load=to_save, checkpoint=checkpoint)
 
-    trainer.run(loaders["train"], max_epochs=max_epochs)
+    trainer.run(loaders["train"], max_epochs=config.max_epochs)
     wandb_logger.close()

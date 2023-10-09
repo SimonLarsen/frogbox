@@ -1,6 +1,6 @@
 {
     "train": {
-        "class": "datasets.example.ExampleDataset",
+        "class_name": "datasets.example.ExampleDataset",
         "params": {
             "split": "train",
             "do_normalize": true,
@@ -8,7 +8,7 @@
         }
     },
     "val": {
-        "class": "datasets.example.ExampleDataset",
+        "class_name": "datasets.example.ExampleDataset",
         "params": {
             "split": "val",
             "do_normalize": true,
@@ -16,7 +16,7 @@
         }
     },
     "test": {
-        "class": "datasets.example.ExampleDataset",
+        "class_name": "datasets.example.ExampleDataset",
         "params": {
             "split": "test",
             "do_normalize": true,

@@ -1,7 +1,13 @@
 stort
 =====
 
+![MIT License](https://img.shields.io/badge/license-MIT%20License-blue.svg)
+
 A simple Torch + Ignite trainer.
+
+The workflow is built around [Torch Ignite](https://pytorch-ignite.ai) and uses [Weights & Biases](https://wandb.ai) for logging metrics.
+
+Experiments are defined using JSON files and supports [jinja2](https://jinja.palletsprojects.com) templates. See `stort.config.Config` for configuration file JSON schema.
 
 ## Installation
 

@@ -23,5 +23,6 @@ setup(
         "pytorch-ignite>=0.4.12",
         "wandb>=0.15.12",
         "tqdm>=4.66.1",
+        "pydantic>=2.4.2",
     ],
 )

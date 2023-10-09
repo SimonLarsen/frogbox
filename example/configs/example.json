@@ -10,7 +10,7 @@
         "every": 1
     },
     "model": {
-        "class": "models.example.ExampleModel",
+        "class_name": "models.example.ExampleModel",
         "params": {
             "scale_factor": 2,
             "in_channels": 3,
@@ -23,26 +23,26 @@
     "losses": {
         "L1": {
             "weight": 1.0,
-            "class": "torch.nn.L1Loss"
+            "class_name": "torch.nn.L1Loss"
         },
         "MSE": {
             "weight": 1.0,
-            "class": "torch.nn.MSELoss"
+            "class_name": "torch.nn.MSELoss"
         }
     },
     "metrics": {
-        "PSNR": {
-            "class": "ignite.metrics.SSIM",
+        "SSIM": {
+            "class_name": "ignite.metrics.SSIM",
             "params": {"data_range": 1.0}
         },
-        "SSIM": {
-            "class": "ignite.metrics.PSNR",
+        "PSNR": {
+            "class_name": "ignite.metrics.PSNR",
             "params": {"data_range": 1.0}
         }
     },
     "datasets": {% include 'datasets.json' %},
     "optimizer": {
-        "class": "torch.optim.Adam",
+        "class_name": "torch.optim.Adam",
         "params": {
             "lr": 1e-4
         }

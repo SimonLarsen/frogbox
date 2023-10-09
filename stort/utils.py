@@ -21,7 +21,7 @@ from torchvision.transforms.functional import (
 from torchvision.utils import make_grid
 from ignite.engine import _prepare_batch
 from ignite.utils import convert_tensor
-from .config import create_object_from_config
+from .config import read_json_config, create_object_from_config
 
 
 def load_model_checkpoint(
@@ -42,10 +42,9 @@ def load_model_checkpoint(
     path = Path(path)
 
     config_path = path.parent / "config.json"
-    with open(config_path, "r") as fp:
-        config = json.load(fp)
+    config = read_json_config(config_path)
 
-    model = create_object_from_config(config["model"])
+    model = create_object_from_config(config.model)
     ckpt = torch.load(path, map_location="cpu")
     model.load_state_dict(ckpt["model"])
     return model, config

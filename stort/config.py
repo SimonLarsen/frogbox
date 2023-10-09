@@ -1,15 +1,53 @@
-from typing import Union, Dict, Any
+from typing import Union, Dict, Any, Optional
 from os import PathLike
 from pathlib import Path
 from importlib import import_module
-import json
 import jinja2
 import torch
+from pydantic import BaseModel
 from ignite.engine import Events
 from ignite.handlers import (
     CosineAnnealingScheduler,
     create_lr_scheduler_with_warmup,
 )
+
+
+class LogInterval(BaseModel):
+    event: str
+    every: int = 1
+
+
+class ObjectDefinition(BaseModel):
+    class_name: str
+    params: Optional[Dict[str, Any]] = dict()
+
+
+class LossDefinition(ObjectDefinition):
+    weight: float
+
+
+class LRSchedulerDefinition(BaseModel):
+    type: str = "cosine"
+    start_value: float = 1e-4
+    end_value: float = 1e-7
+    warmup_steps: int = 0
+
+
+class Config(BaseModel):
+    project: str
+    amp: bool = False
+    clip_grad_norm: Optional[float] = None
+    batch_size: int = 32
+    loader_workers: int = 0
+    max_epochs: int = 32
+    checkpoint_metric: str
+    log_interval: Union[str, LogInterval] = LogInterval(event="EPOCH_COMPLETED", every=1)
+    model: ObjectDefinition
+    losses: Dict[str, LossDefinition]
+    metrics: Dict[str, ObjectDefinition]
+    datasets: Dict[str, ObjectDefinition]
+    optimizer: ObjectDefinition
+    lr_scheduler: LRSchedulerDefinition
 
 
 def read_json_config(path: Union[str, PathLike]) -> Dict[str, Any]:
@@ -19,11 +57,11 @@ def read_json_config(path: Union[str, PathLike]) -> Dict[str, Any]:
     path = Path(path)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(path.parent)))
     template = env.get_template(str(path.relative_to(path.parent)))
-    config = json.loads(template.render())
+    config = Config.model_validate_json(template.render())
     return config
 
 
-def parse_log_interval(s: Union[str, Dict[str, Any]]) -> Events:
+def parse_log_interval(s: Union[str, LogInterval]) -> Events:
     """
     Create ignite event from string or dictionary configuration.
     Dictionary must have a ``event`` entry.
@@ -36,7 +74,13 @@ def parse_log_interval(s: Union[str, Dict[str, Any]]) -> Events:
     if isinstance(s, str):
         return Events[s]
     config = dict(s)
-    event = Events[config.pop("event")]
+    for k, v in config.items():
+        if v is None:
+            del config[k]
+
+    event_name = config.pop("event")
+    event = Events[event_name]
+
     if len(config) > 0:
         event = event(**config)
     return event
@@ -58,7 +102,7 @@ def get_class(path: str) -> Any:
     return getattr(module, class_name)
 
 
-def create_object_from_config(config: Dict[str, Any], **kwargs) -> Any:
+def create_object_from_config(config: ObjectDefinition, **kwargs) -> Any:
     """
     Create object from dictionary configuration.
     Dictionary should have a ``class`` entry and an optional ``params`` entry.
@@ -68,38 +112,37 @@ def create_object_from_config(config: Dict[str, Any], **kwargs) -> Any:
         config = {"class": "torch.optim.Adam", "params": {"lr": 1e-5}}
         optimizer = create_object_from_config(config)
     """
-    obj_class = get_class(config["class"])
-    params = dict(config.get("params", {}))
+    obj_class = get_class(config.class_name)
+    params = dict(config.params)
     params.update(kwargs)
     return obj_class(**params)
 
 
 def create_lr_scheduler_from_config(
     optimizer: torch.optim.Optimizer,
-    config: Dict[str, Any],
+    config: LRSchedulerDefinition,
     max_iterations: int,
 ) -> Any:
     """
     Create a learning rate scheduler from dictionary configuration.
     """
-    if config["type"].lower() != "cosine":
-        raise ValueError(f"Unsupported annealing schedule '{config['type']}'.")
+    if config.type.lower() != "cosine":
+        raise ValueError(f"Unsupported annealing schedule '{config.type}'.")
 
     lr_scheduler = CosineAnnealingScheduler(
         optimizer=optimizer,
         param_name="lr",
-        start_value=config["start_value"],
-        end_value=config["end_value"],
+        start_value=config.start_value,
+        end_value=config.end_value,
         cycle_size=max_iterations,
     )
 
-    warmup_steps = config.get("warmup_steps", 0)
-    if warmup_steps > 0:
+    if config.warmup_steps > 0:
         lr_scheduler = create_lr_scheduler_with_warmup(
             lr_scheduler=lr_scheduler,
             warmup_start_value=0.0,
-            warmup_end_value=config["start_value"],
-            warmup_duration=warmup_steps,
+            warmup_end_value=config.start_value,
+            warmup_duration=config.warmup_steps,
         )
 
     return lr_scheduler
