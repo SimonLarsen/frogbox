@@ -2,7 +2,7 @@ from typing import Optional, Sequence
 from pathlib import Path
 import argparse
 import torch
-from trainer import read_json_config, train_supervised
+from stort import read_json_config, train_supervised
 
 
 def parse_arguments(

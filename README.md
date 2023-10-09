@@ -1,4 +1,4 @@
-torch-ignite-template
-========================
+stort
+=====
 
-A torch+ignite template mainly intended for computer vision.
+A simple Torch + Ignite trainer.
