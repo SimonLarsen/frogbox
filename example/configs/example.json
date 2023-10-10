@@ -1,5 +1,8 @@
 {
     "project": "example-project",
+    "meta": {
+        "model_type": "example"
+    },
     "amp": true,
     "batch_size": 32,
     "loader_workers": 4,

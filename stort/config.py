@@ -61,6 +61,7 @@ class Config(BaseModel):
     datasets: Dict[str, ObjectDefinition]
     optimizer: ObjectDefinition
     lr_scheduler: LRSchedulerDefinition
+    meta: Dict[str, Any] = dict()
 
 
 def read_json_config(path: Union[str, PathLike]) -> Config:

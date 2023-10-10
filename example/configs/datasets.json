@@ -4,7 +4,9 @@
         "params": {
             "split": "train",
             "do_normalize": true,
-            "do_augment": true
+            "do_augment": true,
+            "normalize_mean": [0.5, 0.5, 0.5],
+            "normalize_std": [0.5, 0.5, 0.5]
         }
     },
     "val": {
@@ -12,7 +14,9 @@
         "params": {
             "split": "val",
             "do_normalize": true,
-            "do_augment": false
+            "do_augment": false,
+            "normalize_mean": [0.5, 0.5, 0.5],
+            "normalize_std": [0.5, 0.5, 0.5]
         }
     },
     "test": {
@@ -20,7 +24,9 @@
         "params": {
             "split": "test",
             "do_normalize": true,
-            "do_augment": false
+            "do_augment": false,
+            "normalize_mean": [0.5, 0.5, 0.5],
+            "normalize_std": [0.5, 0.5, 0.5]
         }
     }
 }

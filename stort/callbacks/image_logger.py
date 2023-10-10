@@ -1,0 +1,117 @@
+from typing import Callable, Any, Sequence, Optional, Union
+import torch
+from torchvision.transforms.functional import (
+    InterpolationMode,
+    resize,
+    center_crop,
+    to_pil_image,
+)
+from torchvision.utils import make_grid
+from ignite.engine import _prepare_batch, Events, CallableEventWithFilter
+from ignite.utils import convert_tensor
+import wandb
+from .callback import Callback, CallbackState
+
+
+def create_image_logger_callback(
+    event: Union[Events, CallableEventWithFilter] = Events.EPOCH_COMPLETED,
+    split: str = "test",
+    log_label: str = "test/images",
+    resize_to_fit: bool = True,
+    interpolation: InterpolationMode = InterpolationMode.NEAREST,
+    antialias: bool = True,
+    num_cols: Optional[int] = None,
+    prepare_batch: Callable = _prepare_batch,
+    input_transform: Callable[[Any], Any] = lambda x: x,
+    model_transform: Callable[[Any], Any] = lambda output: output,
+    output_transform: Callable[[Any, Any, Any], Any] = lambda x, y, y_pred: (
+        x,
+        y_pred,
+        y,
+    ),
+):
+    def _callback(state: CallbackState):
+        model = state.model
+        config = state.config
+        device = state.device
+        loaders = state.loaders
+        trainer = state.trainer
+
+        model.eval()
+
+        images = []
+        for batch in iter(loaders[split]):
+            x, y = prepare_batch(batch, device, non_blocking=False)
+            x = input_transform(x)
+            with torch.inference_mode():
+                with torch.autocast(
+                    device_type=device.type, enabled=config.amp
+                ):
+                    y_pred = model_transform(model(x))
+
+                y_pred = y_pred.type(y.dtype)
+                x, y, y_pred = convert_tensor(
+                    x=(x, y, y_pred),
+                    device=torch.device("cpu"),
+                    non_blocking=False,
+                )
+
+                output = output_transform(x, y, y_pred)
+                batch_sizes = [len(e) for e in output]
+                assert all(s == batch_sizes[0] for s in batch_sizes)
+                for i in range(batch_sizes[0]):
+                    grid = _combine_test_images(
+                        images=[e[i] for e in output],
+                        resize_to_fit=resize_to_fit,
+                        interpolation=interpolation,
+                        antialias=antialias,
+                        num_cols=num_cols,
+                    )
+                    images.append(grid)
+
+        images = [wandb.Image(to_pil_image(image)) for image in images]
+        wandb.log(step=trainer.state.iteration, data={log_label: images})
+
+    return Callback(event, _callback)
+
+
+def _combine_test_images(
+    images: Sequence[torch.Tensor],
+    resize_to_fit: bool = True,
+    interpolation: InterpolationMode = InterpolationMode.NEAREST,
+    antialias: bool = True,
+    num_cols: Optional[int] = None,
+) -> torch.Tensor:
+    for image in images:
+        assert len(image.shape) == 3
+        assert image.size(0) in (1, 3)
+
+    max_h = max(image.size(1) for image in images)
+    max_w = max(image.size(2) for image in images)
+
+    transformed = []
+    for image in images:
+        C, H, W = image.shape
+        if H != max_h or W != max_w:
+            if resize_to_fit:
+                image = resize(
+                    image,
+                    size=(max_h, max_w),
+                    interpolation=interpolation,
+                    antialias=antialias,
+                )
+            else:
+                image = center_crop(image, output_size=(max_h, max_w))
+        if C == 1:
+            image = image.repeat((3, 1, 1))
+        image = image.clamp(0.0, 1.0)
+        transformed.append(image)
+
+    if len(transformed) == 1:
+        return transformed[0]
+    else:
+        return make_grid(
+            tensor=transformed,
+            normalize=False,
+            nrow=num_cols or len(transformed),
+        )

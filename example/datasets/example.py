@@ -5,8 +5,8 @@ from torchvision.transforms.functional import pil_to_tensor, resize
 from typing import Tuple, Sequence
 
 
-IMAGENET_MEAN = [0.0, 0.0, 0.0]
-IMAGENET_STD = [1.0, 1.0, 1.0]
+NORMALIZE_MEAN = [0.5, 0.5, 0.5]
+NORMALIZE_STD = [0.5, 0.5, 0.5]
 
 
 class ExampleDataset(Dataset):
@@ -15,8 +15,8 @@ class ExampleDataset(Dataset):
         split: str,
         do_normalize: bool = True,
         do_augment: bool = False,
-        normalize_mean: Sequence[float] = IMAGENET_MEAN,
-        normalize_std: Sequence[float] = IMAGENET_STD,
+        normalize_mean: Sequence[float] = NORMALIZE_MEAN,
+        normalize_std: Sequence[float] = NORMALIZE_STD,
         download: bool = False,
     ):
         super().__init__()

@@ -1,11 +1,10 @@
-from typing import Optional, Any, Union, Callable
+from typing import Optional, Any, Union, Callable, Sequence
 from os import PathLike
 import os
 from math import ceil
 import json
 import torch
 from torch.utils.data import DataLoader
-from torchvision.transforms.functional import to_pil_image
 from ignite.engine import (
     Events,
     _prepare_batch,
@@ -20,9 +19,9 @@ from ..config import (
     create_lr_scheduler_from_config,
 )
 from ..config import Config
-from ..utils import predict_test_images
 from ..engines.supervised import create_supervised_trainer
 from ..losses.composite import CompositeLoss
+from ..callbacks.callback import Callback, CallbackState
 
 
 def _fix_metric_dtypes(data):
@@ -39,6 +38,7 @@ def train_supervised(
     device: Union[str, torch.device],
     checkpoint: Optional[Union[str, PathLike]] = None,
     logging: str = "online",
+    callbacks: Sequence[Callback] = None,
     prepare_batch: Callable = _prepare_batch,
     trainer_model_transform: Callable[[Any], Any] = lambda output: output,
     trainer_output_transform: Callable[
@@ -49,6 +49,39 @@ def train_supervised(
         [Any, Any, Any], Any
     ] = lambda x, y, y_pred: (y_pred, y),
 ):
+    """
+    Train supervised model.
+
+    Parameters
+    ----------
+    config : Config
+        Pipeline configuration.
+    device : torch.device
+        CUDA device. Can be CPU or GPU. Model will not be moved.
+    checkpoint : path-like
+        Path to experiment checkpoint.
+    logging : str
+        Logging mode. Must be either "online", "offline" or "disabled".
+    prepare_batch : Callable
+        function that receives `batch`, `device`, `non_blocking` and outputs
+        tuple of tensors `(batch_x, batch_y)`.
+    trainer_model_transform : Callable
+        function that receives the output from the model during training and
+        converts it into the form as required by the loss function.
+    trainer_output_transform : Callable
+        function that receives `x`, `y`, `y_pred`, `loss` and returns value
+        to be assigned to trainer's `state.output` after each iteration.
+        Default is returning `loss.item()`.
+    evaluator_model_transform : Callable
+        function that receives the output from the model during evaluation and
+        convert it into the predictions:
+        ``y_pred = model_transform(model(x))``.
+    evaluator_output_transform : Callable
+        function that receives `x`, `y`, `y_pred` and returns value to be
+        assigned to evaluator's `state.output` after each iteration.
+        Default is returning `(y_pred, y,)` which fits output expected by
+        metrics. If you change it you should use `output_transform` in metrics.
+    """
     device = torch.device(device)
 
     # Parse config file
@@ -139,7 +172,7 @@ def train_supervised(
         mode=logging,
         project=config.project,
         config=dict(
-            config=config,
+            config=config.model_dump(),
             num_params=sum(p.numel() for p in model.parameters()),
         ),
     )
@@ -178,24 +211,23 @@ def train_supervised(
     def log_validation():
         evaluator.run(loaders["val"])
 
-    @trainer.on(log_interval)
-    def log_test_images(trainer):
-        def output_transform(x, y, y_pred):
-            if datasets["test"].do_normalize:
-                x = datasets["test"].denormalize(x)
-            return x, y_pred, y
+    # Add callback functions
+    if callbacks:
+        for callback in callbacks:
 
-        images = predict_test_images(
-            model=model,
-            data=loaders["test"],
-            device=device,
-            prepare_batch=prepare_batch,
-            output_transform=output_transform,
-            resize_to_fit=True,
-        )
+            def _callback_handler():
+                state = CallbackState(
+                    trainer=trainer,
+                    evaluator=evaluator,
+                    datasets=datasets,
+                    loaders=loaders,
+                    model=model,
+                    config=config,
+                    device=device,
+                )
+                callback.function(state)
 
-        images = [wandb.Image(to_pil_image(image)) for image in images]
-        wandb.log(step=trainer.state.iteration, data={"test/images": images})
+            trainer.add_event_handler(callback.event, _callback_handler)
 
     # Set up checkpoints
     to_save = {
