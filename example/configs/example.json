@@ -45,7 +45,7 @@
     },
     "datasets": {% include 'datasets.json' %},
     "optimizer": {
-        "class_name": "torch.optim.Adam",
+        "class_name": "torch.optim.AdamW",
         "params": {
             "lr": 1e-4
         }

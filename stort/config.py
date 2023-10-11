@@ -1,11 +1,12 @@
 from typing import Union, Dict, Any, Optional
 from os import PathLike
+import warnings
 from enum import Enum
 from pathlib import Path
 from importlib import import_module
 import jinja2
 import torch
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from ignite.engine import Events, CallableEventWithFilter
 from ignite.handlers import (
     CosineAnnealingScheduler,
@@ -62,6 +63,20 @@ class Config(BaseModel):
     optimizer: ObjectDefinition
     lr_scheduler: LRSchedulerDefinition
     meta: Dict[str, Any] = dict()
+
+    @field_validator("datasets")
+    @classmethod
+    def validate_datasets(cls, v):
+        assert "train" in v, "'train' missing in datasets definition."
+        assert "val" in v, "'val' missing in datasets definition."
+        return v
+
+    @field_validator("losses")
+    @classmethod
+    def validate_losses(cls, v):
+        if len(v) == 0:
+            warnings.warn("No loss functions defined.")
+        return v
 
 
 def read_json_config(path: Union[str, PathLike]) -> Config:
