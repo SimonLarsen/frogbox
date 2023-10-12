@@ -18,7 +18,7 @@ from ..config import (
     parse_log_interval,
     create_lr_scheduler_from_config,
 )
-from ..config import Config
+from ..config import Config, CheckpointMode
 from ..engines.supervised import create_supervised_trainer
 from ..losses.composite import CompositeLoss
 from ..callbacks.callback import Callback, CallbackState
@@ -244,12 +244,20 @@ def train_supervised(
             else f"offline-{wandb_logger.run.id}"
         )
 
+        score_fn = Checkpoint.get_default_score_fn(
+            metric_name=config.checkpoint_metric,
+            score_sign=(
+                1.0 if config.checkpoint_mode == CheckpointMode.MAX else -1.0
+            ),
+        )
+
         checkpoint_handler = Checkpoint(
             to_save=to_save,
             save_handler=f"checkpoints/{run_name}",
             filename_prefix="best",
             score_name=config.checkpoint_metric,
-            n_saved=3,
+            score_function=score_fn,
+            n_saved=config.checkpoint_n_saved,
             global_step_transform=global_step_from_engine(trainer),
         )
         evaluator.add_event_handler(Events.COMPLETED, checkpoint_handler)

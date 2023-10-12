@@ -20,6 +20,11 @@ class LogEvent(str, Enum):
     COMPLETED = "COMPLETED"
 
 
+class CheckpointMode(str, Enum):
+    MIN = "min"
+    MAX = "max"
+
+
 class LogInterval(BaseModel):
     event: LogEvent
     every: int = 1
@@ -53,6 +58,8 @@ class Config(BaseModel):
     loader_workers: int = 0
     max_epochs: int = 32
     checkpoint_metric: str
+    checkpoint_mode: CheckpointMode = CheckpointMode.MAX
+    checkpoint_n_saved: int = 3
     log_interval: Union[str, LogInterval] = LogInterval(
         event=LogEvent.EPOCH_COMPLETED, every=1
     )
