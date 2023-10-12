@@ -182,8 +182,8 @@ class Config(BaseModel):
     clip_grad_norm: Optional[float] = None
     gradient_accumulation_steps: int = 1
     model: ObjectDefinition
-    losses: Dict[str, LossDefinition]
-    metrics: Dict[str, ObjectDefinition]
+    losses: Dict[str, LossDefinition] = dict()
+    metrics: Dict[str, ObjectDefinition] = dict()
     datasets: Dict[str, ObjectDefinition]
     loaders: Dict[str, ObjectDefinition] = dict()
     optimizer: ObjectDefinition = ObjectDefinition(
