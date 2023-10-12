@@ -7,7 +7,7 @@ from math import ceil
 from importlib import import_module
 import jinja2
 import torch
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from ignite.engine import Events, CallableEventWithFilter
 from ignite.handlers import (
     CosineAnnealingScheduler,
@@ -164,9 +164,9 @@ class Config(BaseModel):
         Torch optimizer.
     lr_scheduler : LRSchedulerDefinition
         Learning rate scheduler.
-    meta : dict
-        Additional meta data.
     """
+
+    model_config = ConfigDict(extra="allow")
 
     project: str
     amp: bool = False
@@ -190,7 +190,6 @@ class Config(BaseModel):
         class_name="torch.optim.AdamW"
     )
     lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
-    meta: Dict[str, Any] = dict()
 
     @field_validator("datasets")
     @classmethod
