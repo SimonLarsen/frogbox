@@ -157,7 +157,9 @@ class Config(BaseModel):
     metrics : dict of ObjectDefinition
         Evaluation metrics.
     datasets : dict of ObjectDefinition
-        Datasets.
+        Dataset definitions.
+    loaders : dict of ObjectDefinition
+        Data loader definitions.
     optimizer : ObjectDefinition
         Torch optimizer.
     lr_scheduler : LRSchedulerDefinition
@@ -184,8 +186,10 @@ class Config(BaseModel):
     metrics: Dict[str, ObjectDefinition]
     datasets: Dict[str, ObjectDefinition]
     loaders: Dict[str, ObjectDefinition] = dict()
-    optimizer: ObjectDefinition
-    lr_scheduler: LRSchedulerDefinition
+    optimizer: ObjectDefinition = ObjectDefinition(
+        class_name="torch.optim.AdamW"
+    )
+    lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
     meta: Dict[str, Any] = dict()
 
     @field_validator("datasets")

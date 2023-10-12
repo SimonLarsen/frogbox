@@ -44,15 +44,22 @@
         }
     },
     "datasets": {% include 'datasets.json' %},
-    "optimizer": {
-        "class_name": "torch.optim.AdamW",
-        "params": {
-            "lr": 1e-4
+    "loaders": {
+        "train": {
+            "class_name": "torch.utils.data.DataLoader",
+            "params": {
+                "shuffle": true,
+                "drop_last": true
+            }
         }
+    },
+    "optimizer": {
+        "class_name": "torch.optim.AdamW"
     },
     "lr_scheduler": {
         "type": "cosine",
         "start_value": 3e-4,
-        "end_value": 1e-7
+        "end_value": 1e-7,
+        "warmup_steps": 200
     }
 }

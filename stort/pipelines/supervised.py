@@ -91,15 +91,24 @@ def train_supervised(
     # Create data loaders
     datasets = {}
     loaders = {}
-    for split, ds_conf in config.datasets.items():
-        ds = create_object_from_config(ds_conf)
+    for split in config.datasets.keys():
+        ds = create_object_from_config(config.datasets[split])
         datasets[split] = ds
-        loaders[split] = DataLoader(
-            dataset=ds,
-            batch_size=config.batch_size,
-            num_workers=config.loader_workers,
-            shuffle=split == "train",
-        )
+
+        if split in config.loaders:
+            loaders[split] = create_object_from_config(
+                config.loaders[split],
+                dataset=ds,
+                batch_size=config.batch_size,
+                num_workers=config.loader_workers,
+            )
+        else:
+            loaders[split] = DataLoader(
+                dataset=ds,
+                batch_size=config.batch_size,
+                num_workers=config.loader_workers,
+                shuffle=split == "train",
+            )
 
     # Create model
     model = create_object_from_config(config.model)
