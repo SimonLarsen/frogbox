@@ -3,6 +3,7 @@ from os import PathLike
 import warnings
 from enum import Enum
 from pathlib import Path
+from math import ceil
 from importlib import import_module
 import jinja2
 import torch
@@ -10,6 +11,7 @@ from pydantic import BaseModel, field_validator
 from ignite.engine import Events, CallableEventWithFilter
 from ignite.handlers import (
     CosineAnnealingScheduler,
+    LinearCyclicalScheduler,
     create_lr_scheduler_with_warmup,
 )
 
@@ -40,13 +42,17 @@ class LossDefinition(ObjectDefinition):
 
 
 class SchedulerType(str, Enum):
+    LINEAR = "linear"
     COSINE = "cosine"
 
 
 class LRSchedulerDefinition(BaseModel):
-    type: SchedulerType
-    start_value: float = 1e-4
+    type: SchedulerType = SchedulerType.COSINE
+    start_value: float = 3e-4
     end_value: float = 1e-7
+    cycles: int = 1
+    start_value_mult: float = 1.0
+    end_value_mult: float = 1.0
     warmup_steps: int = 0
 
 
@@ -164,16 +170,30 @@ def create_lr_scheduler_from_config(
     """
     Create a learning rate scheduler from dictionary configuration.
     """
-    if config.type.lower() != "cosine":
-        raise ValueError(f"Unsupported annealing schedule '{config.type}'.")
+    cycle_size = ceil(max_iterations / config.cycles)
 
-    lr_scheduler = CosineAnnealingScheduler(
-        optimizer=optimizer,
-        param_name="lr",
-        start_value=config.start_value,
-        end_value=config.end_value,
-        cycle_size=max_iterations,
-    )
+    if config.type == SchedulerType.COSINE:
+        lr_scheduler = CosineAnnealingScheduler(
+            optimizer=optimizer,
+            param_name="lr",
+            start_value=config.start_value,
+            end_value=config.end_value,
+            cycle_size=cycle_size,
+            start_value_mult=config.start_value_mult,
+            end_value_mult=config.end_value_mult,
+        )
+    elif config.type == SchedulerType.LINEAR:
+        lr_scheduler = LinearCyclicalScheduler(
+            optimizer=optimizer,
+            param_name="lr",
+            start_value=config.start_value,
+            end_value=config.end_value,
+            cycle_size=cycle_size,
+            start_value_mult=config.start_value_mult,
+            end_value_mult=config.end_value_mult,
+        )
+    else:
+        raise RuntimeError(f'Unsupported LR scheduler "{config.type}".')
 
     if config.warmup_steps > 0:
         lr_scheduler = create_lr_scheduler_with_warmup(

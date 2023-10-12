@@ -6,7 +6,7 @@
     "amp": true,
     "batch_size": 32,
     "loader_workers": 4,
-    "max_epochs": 32,
+    "max_epochs": 16,
     "checkpoint_metric": "PSNR",
     "log_interval": {
         "event": "EPOCH_COMPLETED",
@@ -52,8 +52,7 @@
     },
     "lr_scheduler": {
         "type": "cosine",
-        "start_value": 1e-4,
-        "end_value": 1e-7,
-        "warmup_steps": 100
+        "start_value": 3e-4,
+        "end_value": 1e-7
     }
 }
