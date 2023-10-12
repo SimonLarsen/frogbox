@@ -1,3 +1,6 @@
+"""
+.. include:: ../README.md
+"""
 __version__ = "0.1.2"
 
 from .pipelines.supervised import train_supervised  # noqa: F401

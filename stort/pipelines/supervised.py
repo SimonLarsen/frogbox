@@ -75,11 +75,11 @@ def train_supervised(
     evaluator_model_transform : Callable
         function that receives the output from the model during evaluation and
         convert it into the predictions:
-        ``y_pred = model_transform(model(x))``.
+        `y_pred = model_transform(model(x))`.
     evaluator_output_transform : Callable
         function that receives `x`, `y`, `y_pred` and returns value to be
         assigned to evaluator's `state.output` after each iteration.
-        Default is returning `(y_pred, y,)` which fits output expected by
+        Default is returning `(y_pred, y)` which fits output expected by
         metrics. If you change it you should use `output_transform` in metrics.
     """
     device = torch.device(device)

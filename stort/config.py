@@ -17,36 +17,100 @@ from ignite.handlers import (
 
 
 class LogEvent(str, Enum):
+    """
+    Log event.
+    """
+
     EPOCH_COMPLETED = "EPOCH_COMPLETED"
     ITERATION_COMPLETED = "ITERATION_COMPLETED"
     COMPLETED = "COMPLETED"
 
 
 class CheckpointMode(str, Enum):
+    """
+    Checkpoint evaluation mode.
+    """
+
     MIN = "min"
     MAX = "max"
 
 
 class LogInterval(BaseModel):
+    """
+    Logging interval.
+
+    Attributes
+    ----------
+    event : LogEvent
+        Event trigger.
+    interval : int
+        How often event should trigger. Defaults to every time (`1`).
+    """
+
     event: LogEvent
     every: int = 1
 
 
 class ObjectDefinition(BaseModel):
+    """
+    Object instance definition.
+
+    Attributes
+    ----------
+    class_name : str
+        Class path string. Example: `torch.optim.AdamW`.
+    params : dict
+        Dictionary of parameters to pass object constructor.
+    """
+
     class_name: str
     params: Optional[Dict[str, Any]] = dict()
 
 
 class LossDefinition(ObjectDefinition):
-    weight: float
+    """
+    Loss function definition
+
+    Attributes
+    ----------
+    weight : float
+        Loss function weight.
+    """
+
+    weight: float = 1.0
 
 
 class SchedulerType(str, Enum):
+    """
+    Parameter scheduler type.
+    """
+
     LINEAR = "linear"
     COSINE = "cosine"
 
 
 class LRSchedulerDefinition(BaseModel):
+    """
+    Learning rate scheduler definition.
+
+    Attributes
+    ----------
+    type : SchedulerType
+        Scheduler type.
+    start_value : float
+        Initial learning rate.
+    end_value : float
+        Final learning rate.
+    cycles : int
+        Number of scheduler cycles. Defaults to `1`.
+    start_value_mult : float
+        Ratio by which to change the start value at the end of each cycle.
+    end_value_mult : float
+        Ratio by which to change the end value at the end of each cycle.
+    warmup_stets : int
+        Number of steps to perform warmup. Set to `0` to disable warmup.
+    """
+
     type: SchedulerType = SchedulerType.COSINE
     start_value: float = 3e-4
     end_value: float = 1e-7
@@ -57,6 +121,49 @@ class LRSchedulerDefinition(BaseModel):
 
 
 class Config(BaseModel):
+    """
+    Trainer configuration.
+
+    Attributes
+    ----------
+    project : str
+        Project name.
+    amp : bool
+        If `true` automatic mixed-precision is enabled.
+    clip_grad_norm : float
+        Clip gradients to norm if provided.
+    batch_size : int
+        Batch size.
+    loader_workers : int
+        How many subprocesses to use for data loading.
+        `0` means the data will be loaded in the main process.
+    max_epochs : int
+        Maximum number of epochs to train for.
+    checkpoint_metric : str
+        Name of metric to use for evaluating checkpoints.
+    checkpoint_mode : CheckpointMode
+        Either `min` or `max`. Determines whether to keep the checkpoints
+        with the greatest or lowest metric score.
+    checkpoint_n_saved : int
+        Number of checkpoints to keep.
+    log_interval : str or LogInterval
+        At which interval to log metrics.
+    model : ObjectDefinition
+        Model object definition.
+    losses : dict of LossDefinition
+        Loss functions.
+    metrics : dict of ObjectDefinition
+        Evaluation metrics.
+    datasets : dict of ObjectDefinition
+        Datasets.
+    optimizer : ObjectDefinition
+        Torch optimizer.
+    lr_scheduler : LRSchedulerDefinition
+        Learning rate scheduler.
+    meta : dict
+        Additional meta data.
+    """
+
     project: str
     amp: bool = False
     clip_grad_norm: Optional[float] = None
@@ -95,6 +202,11 @@ class Config(BaseModel):
 def read_json_config(path: Union[str, PathLike]) -> Config:
     """
     Read and render JSON config file and render using jinja2.
+
+    Parameters
+    ----------
+    path : str or path-like
+        Path to JSON config file.
     """
     path = Path(path)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(path.parent)))
@@ -109,11 +221,6 @@ def parse_log_interval(
     """
     Create ignite event from string or dictionary configuration.
     Dictionary must have a ``event`` entry.
-
-    Example
-    -------
-        log_interval = {"event": "ITERATION_COMPLETED", "every": 100}
-        event = parse_log_interval(log_interval)
     """
     if isinstance(s, str):
         return Events[s]
@@ -136,8 +243,8 @@ def get_class(path: str) -> Any:
 
     Example
     -------
-        cl = get_class("torch.optim.Adam)
-        optimizer = cl(lr=1e-5)
+    >>> cl = get_class("torch.optim.Adam)
+    >>> optimizer = cl(lr=1e-5)
     """
     parts = path.split(".")
     module_path = ".".join(parts[:-1])
@@ -153,8 +260,8 @@ def create_object_from_config(config: ObjectDefinition, **kwargs) -> Any:
 
     Example
     -------
-        config = {"class": "torch.optim.Adam", "params": {"lr": 1e-5}}
-        optimizer = create_object_from_config(config)
+    >>> config = {"class": "torch.optim.Adam", "params": {"lr": 1e-5}}
+    >>> optimizer = create_object_from_config(config)
     """
     obj_class = get_class(config.class_name)
     params = dict(config.params)

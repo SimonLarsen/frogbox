@@ -18,7 +18,8 @@ def load_model_checkpoint(
 
     Returns
     -------
-    A tuple (model, config).
+    checkpoint : torch.nn.Module, Config
+        Model checkpoint and config.
     """
     path = Path(path)
 
