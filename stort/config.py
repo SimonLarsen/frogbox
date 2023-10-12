@@ -130,8 +130,6 @@ class Config(BaseModel):
         Project name.
     amp : bool
         If `true` automatic mixed-precision is enabled.
-    clip_grad_norm : float
-        Clip gradients to norm if provided.
     batch_size : int
         Batch size.
     loader_workers : int
@@ -148,6 +146,10 @@ class Config(BaseModel):
         Number of checkpoints to keep.
     log_interval : str or LogInterval
         At which interval to log metrics.
+    clip_grad_norm : float
+        Clip gradients to norm if provided.
+    gradient_accumulation_steps : int
+        Number of steps the gradients should be accumulated across.
     model : ObjectDefinition
         Model object definition.
     losses : dict of LossDefinition
@@ -166,7 +168,6 @@ class Config(BaseModel):
 
     project: str
     amp: bool = False
-    clip_grad_norm: Optional[float] = None
     batch_size: int = 32
     loader_workers: int = 0
     max_epochs: int = 32
@@ -176,10 +177,13 @@ class Config(BaseModel):
     log_interval: Union[str, LogInterval] = LogInterval(
         event=LogEvent.EPOCH_COMPLETED, every=1
     )
+    clip_grad_norm: Optional[float] = None
+    gradient_accumulation_steps: int = 1
     model: ObjectDefinition
     losses: Dict[str, LossDefinition]
     metrics: Dict[str, ObjectDefinition]
     datasets: Dict[str, ObjectDefinition]
+    loaders: Dict[str, ObjectDefinition] = dict()
     optimizer: ObjectDefinition
     lr_scheduler: LRSchedulerDefinition
     meta: Dict[str, Any] = dict()

@@ -5,11 +5,7 @@ from math import ceil
 import json
 import torch
 from torch.utils.data import DataLoader
-from ignite.engine import (
-    Events,
-    _prepare_batch,
-    create_supervised_evaluator,
-)
+from ignite.engine import Events, _prepare_batch
 from ignite.handlers import global_step_from_engine, Checkpoint, TerminateOnNan
 from ignite.contrib.handlers import ProgressBar, WandBLogger
 import wandb
@@ -19,9 +15,12 @@ from ..config import (
     create_lr_scheduler_from_config,
 )
 from ..config import Config, CheckpointMode
-from ..engines.supervised import create_supervised_trainer
 from ..losses.composite import CompositeLoss
 from ..callbacks.callback import Callback, CallbackState
+from ..engines.supervised import (
+    create_supervised_trainer,
+    create_supervised_evaluator,
+)
 
 
 def _fix_metric_dtypes(data):
@@ -48,6 +47,8 @@ def train_supervised(
     evaluator_output_transform: Callable[
         [Any, Any, Any], Any
     ] = lambda x, y, y_pred: (y_pred, y),
+    trainer_factory: Callable = create_supervised_trainer,
+    evaluator_factory: Callable = create_supervised_evaluator,
 ):
     """
     Train supervised model.
@@ -129,14 +130,12 @@ def train_supervised(
         metrics[metric_label] = metric
 
     # Create trainer
-    trainer = create_supervised_trainer(
+    trainer = trainer_factory(
+        config=config,
         model=model,
         optimizer=optimizer,
         loss_fn=loss_fn,
         device=device,
-        amp=config.amp,
-        scaler=config.amp,
-        clip_grad_norm=config.clip_grad_norm,
         prepare_batch=prepare_batch,
         model_transform=trainer_model_transform,
         output_transform=trainer_output_transform,
@@ -156,11 +155,11 @@ def train_supervised(
     trainer.add_event_handler(Events.ITERATION_COMPLETED, TerminateOnNan())
 
     # Create evaluator
-    evaluator = create_supervised_evaluator(
+    evaluator = evaluator_factory(
+        config=config,
         model=model,
         metrics=metrics,
         device=device,
-        amp_mode="amp" if config.amp else None,
         prepare_batch=prepare_batch,
         model_transform=evaluator_model_transform,
         output_transform=evaluator_output_transform,

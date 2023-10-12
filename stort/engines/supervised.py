@@ -1,11 +1,13 @@
+from typing import Union, Callable, Any, Sequence, Tuple, Optional, Dict
 import torch
 from ignite.engine.deterministic import DeterministicEngine
-from ignite.engine.engine import Engine
-from ignite.engine import _prepare_batch
-from typing import Union, Callable, Any, Optional, Sequence, Tuple
+from ignite.engine import Engine, _prepare_batch
+from ignite.metrics import Metric
+from ..config import Config
 
 
 def create_supervised_trainer(
+    config: Config,
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     loss_fn: Union[Callable, torch.nn.Module],
@@ -17,21 +19,14 @@ def create_supervised_trainer(
         [Any, Any, Any, torch.Tensor], Any
     ] = lambda x, y, y_pred, loss: loss.item(),
     deterministic: bool = False,
-    amp: bool = False,
-    scaler: Union[bool, "torch.cuda.amp.GradScaler"] = False,
-    gradient_accumulation_steps: int = 1,
-    clip_grad_norm: Optional[float] = None,
 ) -> Engine:
     """
-    Factory function for supervised evaluation.
-
-    Similar to ignite.engine.create_supervised_trainer except:
-    1. Gradient clipping is added through the `clip_grad_norm` argument.
-    2. TPU and APEX is not currently supported.
-       AMP is enabled with the `amp` argument.
+    Factory function for supervised trainer.
 
     Parameters
     ----------
+    config : Config
+        Project configuration.
     model : torch.nn.Module
         The model to train.
     optimizer : torch optimizer
@@ -39,9 +34,9 @@ def create_supervised_trainer(
     loss_fn : torch.nn.Module
         The loss function to use.
     device : torch.device
-        Device type specification (default: None).
+        Device type specification.
         Applies to batches after starting the engine. Model will not be moved.
-        Device can be CPU, GPU or TPU.
+        Device can be CPU, GPU.
     non_blocking : bool
         If `True` and this copy is between CPU and GPU, the copy may
         occur asynchronously with respect to the host.
@@ -53,31 +48,25 @@ def create_supervised_trainer(
         Function that receives the output from the model and
         convert it into the form as required by the loss function.
     output_transform : Callable
-        Function that receives 'x', 'y', 'y_pred', 'loss' and
+        Function that receives `x`, `y`, `y_pred`, `loss` and
         returns value to be assigned to engine's state.output after each
         iteration. Default is returning `loss.item()`.
     deterministic : bool
         If `True`, returns `DeterministicEngine`, otherwise `Engine`.
-    amp : bool
-        If `True`, enables automatic mixed-precision.
-    scaler : torch.cuda.amp.GradScaler
-        GradScaler instance for gradient scaling. If `True`, will create
-        default GradScaler. If GradScaler instance is passed, it will be used.
-    gradient_accumulation_steps : int
-        Number of steps to accumulate gradients over.
-    clip_grad_norm : float
-        Clip gradients to norm if provided.
 
     Returns
     -------
     trainer : torch.ignite.Engine
         A trainer engine with supervised update function.
     """
+    amp = config.amp
+    clip_grad_norm = config.clip_grad_norm
+    gradient_accumulation_steps = config.gradient_accumulation_steps
+
     device = torch.device(device)
-    device_type = device.type if isinstance(device, torch.device) else device
-    if "xla" in device_type:
+    if "xla" in device.type:
         raise ValueError("TPU not supported in trainer.")
-    if amp and isinstance(scaler, bool) and scaler:
+    if amp:
         scaler = torch.cuda.amp.GradScaler(enabled=True)
 
     def _update(
@@ -127,3 +116,74 @@ def create_supervised_trainer(
     if scaler:
         trainer.state.scaler = scaler
     return trainer
+
+
+def create_supervised_evaluator(
+    config: Config,
+    model: torch.nn.Module,
+    metrics: Optional[Dict[str, Metric]] = None,
+    device: Union[str, torch.device] = "cpu",
+    non_blocking: bool = False,
+    prepare_batch: Callable = _prepare_batch,
+    model_transform: Callable[[Any], Any] = lambda output: output,
+    output_transform: Callable[[Any, Any, Any], Any] = lambda x, y, y_pred: (
+        y_pred,
+        y,
+    ),
+) -> Engine:
+    """
+    Factory function for supervised evaluator.
+
+    Parameters
+    ----------
+    config : Config
+        Project configuration.
+    model : torch.nn.Module
+        The model to train.
+    metrics : dict
+        Dictionary of evaluation metrics.
+    device : torch.device
+        Device type specification.
+        Applies to batches after starting the engine. Model will not be moved.
+        Device can be CPU, GPU.
+    non_blocking : bool
+        If `True` and this copy is between CPU and GPU, the copy may
+        occur asynchronously with respect to the host.
+        For other cases, this argument has no effect.
+    prepare_batch : Callable
+        Function that receives `batch`, `device`, `non_blocking`
+        and outputs tuple of tensors `(batch_x, batch_y)`.
+    model_transform : Callable
+        Function that receives the output from the model and convert it into
+        the predictions: `y_pred = model_transform(model(x))`.
+    output_transform : Callable
+        Function that receives `x`, `y`, `y_pred` and returns value to be
+        assigned to engine's state.output after each iteration.
+        Default is returning `(y_pred, y,)` which fits output expected by
+        metrics. If you change it you should use `output_transform` in metrics.
+    """
+
+    device = torch.device(device)
+    if "xla" in device.type:
+        raise ValueError("TPU not supported in trainer.")
+
+    def _step(
+        engine: Engine, batch: Sequence[torch.Tensor]
+    ) -> Union[Any, Tuple[torch.Tensor]]:
+        model.eval()
+        with torch.no_grad():
+            x, y = prepare_batch(
+                batch, device=device, non_blocking=non_blocking
+            )
+            with torch.autocast(device_type=device.type, enabled=config.amp):
+                output = model(x)
+                y_pred = model_transform(output)
+            return output_transform(x, y, y_pred)
+
+    evaluator = Engine(_step)
+
+    if metrics:
+        for name, metric in metrics.items():
+            metric.attach(evaluator, name)
+
+    return evaluator
