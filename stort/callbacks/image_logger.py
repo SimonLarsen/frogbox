@@ -9,6 +9,7 @@ from torchvision.transforms.functional import (
 from torchvision.utils import make_grid
 from ignite.engine import _prepare_batch, Events, CallableEventWithFilter
 from ignite.utils import convert_tensor
+from kornia.enhance import Denormalize
 import wandb
 from .callback import Callback, CallbackState
 
@@ -21,6 +22,10 @@ def create_image_logger_callback(
     interpolation: InterpolationMode = InterpolationMode.NEAREST,
     antialias: bool = True,
     num_cols: Optional[int] = None,
+    normalize_mean: Sequence[float] = (0.0, 0.0, 0.0),
+    normalize_std: Sequence[float] = (1.0, 1.0, 1.0),
+    denormalize_input: bool = False,
+    denormalize_target: bool = False,
     prepare_batch: Callable = _prepare_batch,
     input_transform: Callable[[Any], Any] = lambda x: x,
     model_transform: Callable[[Any], Any] = lambda output: output,
@@ -30,6 +35,39 @@ def create_image_logger_callback(
         y,
     ),
 ):
+    """
+    Create image logger callback.
+
+    Parameters
+    ----------
+    event : Ignite event
+        Event to trigger callback. Defaults to every epoch.
+    split : str
+        Dataset split to evaluate on. Defaults to "test".
+    log_label : str
+        Label to log images under in Weights & Biases.
+    resize_to_fit : bool
+        If `true` smaller images are resized to fit canvas.
+    interpolation : torchvision.transforms.functional.InterpolationMode
+        Interpolation to use for resizing images.
+    antialias : bool
+        If `true` antialiasing is used when resizing images.
+    num_cols : int
+        Number of columns in image grid.
+    normalize_mean : (float, float, float)
+        RGB mean values used in image normalization.
+    normalize_std : (float, float, float)
+        RGB std.dev. values used in image normalization.
+    denormalize_input : bool
+        If `true` input images a denormalized before logging.
+    denormalize_target : bool
+        If `true` target images (y and y_pred) are denormalized before logging.
+    """
+    denormalize = Denormalize(
+        torch.as_tensor(normalize_mean),
+        torch.as_tensor(normalize_std),
+    )
+
     def _callback(state: CallbackState):
         model = state.model
         config = state.config
@@ -56,7 +94,14 @@ def create_image_logger_callback(
                     non_blocking=False,
                 )
 
+                if denormalize_input:
+                    x = denormalize(x)
+                if denormalize_target:
+                    y = denormalize(y)
+                    y_pred = denormalize(y_pred)
+
                 output = output_transform(x, y, y_pred)
+
                 batch_sizes = [len(e) for e in output]
                 assert all(s == batch_sizes[0] for s in batch_sizes)
                 for i in range(batch_sizes[0]):
