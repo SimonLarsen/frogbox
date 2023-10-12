@@ -173,7 +173,7 @@ class Config(BaseModel):
     batch_size: int = 32
     loader_workers: int = 0
     max_epochs: int = 32
-    checkpoint_metric: str
+    checkpoint_metric: Optional[str] = None
     checkpoint_mode: CheckpointMode = CheckpointMode.MAX
     checkpoint_n_saved: int = 3
     log_interval: Union[str, LogInterval] = LogInterval(

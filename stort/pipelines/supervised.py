@@ -252,19 +252,23 @@ def train_supervised(
             else f"offline-{wandb_logger.run.id}"
         )
 
-        score_fn = Checkpoint.get_default_score_fn(
-            metric_name=config.checkpoint_metric,
-            score_sign=(
-                1.0 if config.checkpoint_mode == CheckpointMode.MAX else -1.0
-            ),
-        )
+        score_function = None
+        if config.checkpoint_metric:
+            score_function = Checkpoint.get_default_score_fn(
+                metric_name=config.checkpoint_metric,
+                score_sign=(
+                    1.0
+                    if config.checkpoint_mode == CheckpointMode.MAX
+                    else -1.0
+                ),
+            )
 
         checkpoint_handler = Checkpoint(
             to_save=to_save,
             save_handler=f"checkpoints/{run_name}",
             filename_prefix="best",
             score_name=config.checkpoint_metric,
-            score_function=score_fn,
+            score_function=score_function,
             n_saved=config.checkpoint_n_saved,
             global_step_transform=global_step_from_engine(trainer),
         )
