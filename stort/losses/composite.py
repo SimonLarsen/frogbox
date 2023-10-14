@@ -3,6 +3,9 @@ from typing import Sequence
 
 
 class CompositeLoss(torch.nn.Module):
+    """
+    Criterion that is a weighted sum of multiple loss functions.
+    """
     def __init__(
         self,
         labels: Sequence[str],
@@ -19,6 +22,9 @@ class CompositeLoss(torch.nn.Module):
         self.last_values = [None] * len(losses)
 
     def forward(self, input, target):
+        """
+        Compute loss.
+        """
         total_loss = 0.0
         for i, (w, l) in enumerate(zip(self.weights, self.losses)):
             loss = w * l(input, target)
