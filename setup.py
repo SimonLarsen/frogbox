@@ -17,6 +17,7 @@ setup(
     author_email="simonhffh@gmail.com",
     license="MIT",
     packages=find_packages(),
+    include_package_data=True,
     install_requires=[
         "torch>=2.0.0,<2.1.0",
         "torchvision>=0.15.0,<0.16.0",
@@ -26,4 +27,5 @@ setup(
         "tqdm>=4.66.1",
         "pydantic>=2.4.2",
     ],
+    entry_points={"console_scripts": ["stort=stort.cli:cli"]},
 )

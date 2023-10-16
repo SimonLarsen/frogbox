@@ -5,3 +5,4 @@ kornia>=0.7.0
 wandb>=0.15.12
 tqdm>=4.66.1
 pydantic>=2.4.2
+click>=8.1.7

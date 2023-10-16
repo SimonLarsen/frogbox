@@ -3,7 +3,6 @@ from pathlib import Path
 import argparse
 import torch
 from stort import read_json_config, train_supervised
-from stort.callbacks import create_image_logger
 
 
 def parse_arguments(
@@ -30,17 +29,9 @@ if __name__ == "__main__":
     args = parse_arguments()
     config = read_json_config(args.config)
 
-    dataset_params = config.datasets["test"].params
-    image_logger = create_image_logger(
-        normalize_mean=dataset_params["normalize_mean"],
-        normalize_std=dataset_params["normalize_std"],
-        denormalize_input=dataset_params["do_normalize"],
-    )
-
     train_supervised(
         config=config,
         device=args.device,
         checkpoint=args.checkpoint,
         logging=args.logging,
-        callbacks=[image_logger],
     )

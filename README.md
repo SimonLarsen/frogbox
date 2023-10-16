@@ -15,14 +15,74 @@ Experiments are defined using JSON files and supports [jinja2](https://jinja.pal
 pip install git+https://SimonLarsen@github.com/SimonLarsen/torch-ignite-template.git
 ```
 
-## Usage
+## Getting started
+
+Create a new project using the `stort` CLI tool:
+
+```sh
+stort project new -t default -d myproject
+```
+
+See example project in [example/train.py](example/train.py).
+
+## Loading a trained model
+
+Trained models can be loaded with `stort.utils.load_model_checkpoint`. The function returns the trained model as well the trainer configuration.
 
 ```python
 import torch
-from stort import read_json_config, train_supervised
+from stort.utils import load_model_checkpoint
 
-config = read_json_config("config.json")
-train_supervised(config=config, device=torch.device("cuda:0"))
+model, config = load_model_checkpoint("checkpoints/mymodel/checkpoint.py")
+
+device = torch.device("cuda:0")
+model = model.eval().to(device)
+
+x = torch.rand((1, 3, 16, 16), device=device)
+with torch.inference_mode():
+    pred = model(x)
 ```
 
-See example project in `example/train.py`.
+## Logging images
+
+The simplest way to log images during training is to create an callback with `stort.callbacks.image_logger.create_image_logger`:
+
+```python
+from stort import train_supervised
+from stort.callbacks import create_image_logger
+
+train_supervised(
+    config=config,
+    device=device,
+    checkpoint=checkpoint,
+    callbacks=[create_image_logger()]
+)
+```
+
+Images can automatically be denormalized by setting `denormalize_input`/`denormalize_output` and providing the mean and standard deviation used for normalization.
+
+For instance, if input images are normalized with ImageNet parameters and outputs are in [0, 1]:
+
+```python
+image_logger = create_image_logger(
+    normalize_mean=[0.485, 0.456, 0.406],
+    normalize_std=[0.229, 0.224, 0.225],
+    denormalize_input=True,
+)
+```
+
+More advanced transformations can be made by overriding `input_transform`, `model_transform`, or `output_transform`:
+
+```python
+from torchvision.transforms.functional import hflip
+
+def flip_input(x, y, y_pred):
+    x = hflip(x)
+    return x, y_pred, y
+
+image_logger = create_image_logger(
+    output_transform=flip_input,
+)
+```
+
+## Callbacks

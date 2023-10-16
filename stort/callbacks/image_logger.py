@@ -14,7 +14,7 @@ import wandb
 from .callback import Callback, CallbackState
 
 
-def create_image_logger_callback(
+def create_image_logger(
     event: Union[Events, CallableEventWithFilter] = Events.EPOCH_COMPLETED,
     split: str = "test",
     log_label: str = "test/images",
