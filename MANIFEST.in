@@ -1,0 +1,2 @@
+include stort/data/*.json
+include stort/data/*.py
