@@ -1,14 +1,14 @@
 {
     "project": "example",
     "model": {
-        "class_name": "models.ExampleModel"
+        "class_name": "models.example.ExampleModel"
     },
     "datasets": {
         "train": {
-            "class_name": "datasets.ExampleDataset"
+            "class_name": "datasets.example.ExampleDataset"
         },
         "val": {
-            "class_name": "datasets.ExampleDataset"
+            "class_name": "datasets.example.ExampleDataset"
         }
     }
 }

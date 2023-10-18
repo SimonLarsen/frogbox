@@ -1,9 +1,8 @@
 """@private"""
 
 import click
-import importlib.resources
+from importlib.resources import path as resource_path
 from pathlib import Path
-from .config import Config
 
 
 @click.group()
@@ -49,47 +48,35 @@ def project():
 )
 def new(type_: str, dir_: Path, overwrite: bool = False):
     """Create a new project from template."""
-    config_path = dir_ / "configs" / "example.json"
-    train_py_path = dir_ / "train.py"
-    if not overwrite and (config_path.exists() or train_py_path.exists()):
-        raise RuntimeError("Project directory is not empty.")
 
-    # Create project directory
-    dir_.mkdir(exist_ok=True, parents=True)
+    template_inputs = [
+        resource_path("stort.data", "train.py"),
+        resource_path("stort.data", f"config_{type_}.json"),
+        resource_path("stort.data", "example_model.py"),
+        resource_path("stort.data", "example_dataset.py"),
+    ]
 
-    # Write config file
-    config_path.parent.mkdir(exist_ok=True)
+    template_outputs = [
+        dir_ / "train.py",
+        dir_ / "configs" / "example.json",
+        dir_ / "models" / "example.py",
+        dir_ / "datasets" / "example.py",
+    ]
 
-    if type_ == "minimal":
-        config_data = importlib.resources.read_text(
-            package="stort.data",
-            resource="config_minimal.json",
-        )
-    elif type_ == "default":
-        config_data = importlib.resources.read_text(
-            package="stort.data",
-            resource="config_default.json",
-        )
-    elif type_ == "full":
-        config_data = importlib.resources.read_text(
-            package="stort.data",
-            resource="config_default.json",
-        )
-        config = Config.model_validate_json(config_data)
-        config_data = config.model_dump_json(indent=4)
-    else:
-        raise RuntimeError(f"Unknown template type {type_}.")
+    # Check if files already exist
+    if not overwrite:
+        for path in template_outputs:
+            if path.exists():
+                raise RuntimeError("Project directory is not empty.")
 
-    with config_path.open("w") as fp:
-        fp.write(config_data)
+    # Create folders and copy template files
+    for input_path, output_path in zip(template_inputs, template_outputs):
+        output_path.parent.mkdir(exist_ok=True, parents=True)
+        with input_path.open("r") as fp:
+            file_data = fp.read()
 
-    # Write train.py script
-    train_py_data = importlib.resources.read_text(
-        package="stort.data",
-        resource="train.py",
-    )
-    with train_py_path.open("w") as fp:
-        fp.write(train_py_data)
+        with output_path.open("w") as fp:
+            fp.write(file_data)
 
 
 if __name__ == "__main__":

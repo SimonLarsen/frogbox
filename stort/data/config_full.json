@@ -4,20 +4,32 @@
     "batch_size": 8,
     "loader_workers": 4,
     "max_epochs": 100,
+    "checkpoint_metric": null,
+    "checkpoint_mode": "max",
+    "checkpoint_n_saved": 3,
+    "log_interval": {
+        "event": "EPOCH_COMPLETED",
+        "every": 1
+    },
+    "clip_grad_norm": null,
+    "gradient_accumulation_steps": 1,
     "model": {
         "class_name": "models.example.ExampleModel",
         "params": {}
     },
     "losses": {
         "L1": {
-            "weight": 1.0,
-            "class_name": "torch.nn.L1Loss"
+            "class_name": "torch.nn.L1Loss",
+            "params": {},
+            "weight": 1.0
         }
     },
     "metrics": {
         "PSNR": {
             "class_name": "ignite.metrics.PSNR",
-            "params": {"data_range": 1.0}
+            "params": {
+                "data_range": 1.0
+            }
         }
     },
     "datasets": {
@@ -30,10 +42,18 @@
             "params": {}
         }
     },
+    "loaders": {},
+    "optimizer": {
+        "class_name": "torch.optim.AdamW",
+        "params": {}
+    },
     "lr_scheduler": {
         "type": "cosine",
-        "start_value": 1e-4,
+        "start_value": 0.0001,
         "end_value": 1e-7,
+        "cycles": 1,
+        "start_value_mult": 1.0,
+        "end_value_mult": 1.0,
         "warmup_steps": 100
     }
 }
