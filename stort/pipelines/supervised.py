@@ -36,6 +36,7 @@ def train_supervised(
     config: Config,
     device: Union[str, torch.device],
     checkpoint: Optional[Union[str, PathLike]] = None,
+    checkpoint_keys: Optional[Sequence[str]] = None,
     logging: str = "online",
     callbacks: Sequence[Callback] = None,
     prepare_batch: Callable = _prepare_batch,
@@ -61,24 +62,26 @@ def train_supervised(
         CUDA device. Can be CPU or GPU. Model will not be moved.
     checkpoint : path-like
         Path to experiment checkpoint.
+    checkpoint_keys : list of str
+        List of keys for objects to load from checkpoint. Defaults to all keys.
     logging : str
         Logging mode. Must be either "online", "offline" or "disabled".
     prepare_batch : Callable
-        function that receives `batch`, `device`, `non_blocking` and outputs
+        Function that receives `batch`, `device`, `non_blocking` and outputs
         tuple of tensors `(batch_x, batch_y)`.
     trainer_model_transform : Callable
-        function that receives the output from the model during training and
+        Function that receives the output from the model during training and
         converts it into the form as required by the loss function.
     trainer_output_transform : Callable
-        function that receives `x`, `y`, `y_pred`, `loss` and returns value
+        Function that receives `x`, `y`, `y_pred`, `loss` and returns value
         to be assigned to trainer's `state.output` after each iteration.
         Default is returning `loss.item()`.
     evaluator_model_transform : Callable
-        function that receives the output from the model during evaluation and
+        Function that receives the output from the model during evaluation and
         convert it into the predictions:
         `y_pred = model_transform(model(x))`.
     evaluator_output_transform : Callable
-        function that receives `x`, `y`, `y_pred` and returns value to be
+        Function that receives `x`, `y`, `y_pred` and returns value to be
         assigned to evaluator's `state.output` after each iteration.
         Default is returning `(y_pred, y)` which fits output expected by
         metrics. If you change it you should use `output_transform` in metrics.
@@ -278,9 +281,18 @@ def train_supervised(
         with open(f"checkpoints/{run_name}/config.json", "w") as fp:
             json.dump(config.model_dump(), fp, indent=2)
 
-    # Start training
+    # Load checkpoints
     if checkpoint:
-        Checkpoint.load_objects(to_load=to_save, checkpoint=str(checkpoint))
+        if checkpoint_keys:
+            to_load = {k: to_save[k] for k in checkpoint_keys}
+        else:
+            to_load = to_save
 
+        Checkpoint.load_objects(
+            to_load=to_load,
+            checkpoint=torch.load(str(checkpoint), "cpu"),
+        )
+
+    # Start training
     trainer.run(loaders["train"], max_epochs=config.max_epochs)
     wandb_logger.close()

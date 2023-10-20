@@ -17,6 +17,8 @@ def parse_arguments(
         "-d", "--device", type=torch.device, default=torch.device("cuda:0")
     )
     parser.add_argument("--checkpoint", type=Path)
+    parser.add_argument("--checkpoint-keys", type=str, nargs="+")
+    parser.add_argument("--model-checkpoint", type=Path)
     parser.add_argument(
         "--logging",
         type=str,
@@ -41,6 +43,7 @@ if __name__ == "__main__":
         config=config,
         device=args.device,
         checkpoint=args.checkpoint,
+        checkpoint_keys=args.checkpoint_keys,
         logging=args.logging,
         callbacks=[image_logger],
     )
