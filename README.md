@@ -86,3 +86,29 @@ image_logger = create_image_logger(
 ```
 
 ## Callbacks
+
+## JSON config validation
+
+A JSON schema can be generated to use for validation by calling `stort config schema`.
+
+### Schema validation and completion in Visual Studio Code
+
+To enable schema validation in VSCode generate a schema and add it to your `settings.json` under `json.schemas`.
+
+**Warning: This overrides your current workspace settings.**
+
+```sh
+stort config schema -o .config_schema
+cat > .vscode/settings.json << EOL
+{
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "/configs/*.json"
+            ],
+            "url": "./.config_schema"
+        }
+    ]
+}
+EOL
+```

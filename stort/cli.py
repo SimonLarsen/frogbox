@@ -1,8 +1,11 @@
 """@private"""
 
-import click
-import importlib.resources
+from typing import Optional
 from pathlib import Path
+import json
+import importlib.resources
+import click
+from .config import Config, read_json_config
 
 
 @click.group()
@@ -75,6 +78,50 @@ def new(type_: str, dir_: Path, overwrite: bool = False):
         file_data = resource_files.joinpath(input_resource).read_text()
         output_path.parent.mkdir(exist_ok=True, parents=True)
         output_path.write_text(file_data)
+
+
+@cli.group()
+def config():
+    """Work with config files."""
+    pass
+
+
+@config.command()
+@click.option(
+    "--path",
+    "-p",
+    type=click.Path(
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        path_type=Path,
+    ),
+    required=True,
+    help="Config file path.",
+)
+def validate(path: Path):
+    """Validate config file."""
+    read_json_config(path)
+
+
+@config.command()
+@click.option(
+    "--out",
+    "-o",
+    type=click.Path(
+        exists=False,
+        file_okay=True,
+        dir_okay=False,
+        path_type=Path,
+    ),
+    help="Write schema to file.",
+)
+def schema(out: Optional[Path] = None):
+    schema = json.dumps(Config.model_json_schema(), indent=2)
+    if out:
+        out.write_text(schema)
+    else:
+        print(schema)
 
 
 if __name__ == "__main__":
