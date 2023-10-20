@@ -87,7 +87,7 @@ image_logger = create_image_logger(
 
 ## Callbacks
 
-Custom callbacks can be added with the `stort.callback.Callback` object.
+Custom callbacks can be added by creating a `stort.callbacks.Callback` object.
 
 For instance, in the following example a callback is added to unfreeze the model's encoder after 20 epochs:
 
