@@ -60,8 +60,8 @@ def install_callbacks(
     state: CallbackState,
 ):
     for callback in callbacks:
-
-        def __callback_handler():
-            callback.function(state)
-
-        trainer.add_event_handler(callback.event, __callback_handler)
+        trainer.add_event_handler(
+            event_name=callback.event,
+            handler=callback,
+            state=state,
+        )

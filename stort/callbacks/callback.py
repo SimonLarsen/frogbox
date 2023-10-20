@@ -26,6 +26,9 @@ class Callback:
         self._event = event
         self._function = function
 
+    def __call__(self, engine: Engine, state: CallbackState):
+        self.function(state)
+
     @property
     def event(self) -> Union[Events, CallableEventWithFilter]:
         return self._event

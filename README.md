@@ -87,6 +87,25 @@ image_logger = create_image_logger(
 
 ## Callbacks
 
+Custom callbacks can be added with the `stort.callback.Callback` object.
+
+For instance, in the following example a callback is added to unfreeze the model's encoder after 20 epochs:
+
+```python
+from stort import Events
+from stort.callbacks import Callback, CallbackState
+
+def unfreeze_encoder(state: CallbackState)
+    state.model.encoder.requires_grad_(True)
+
+unfreeze_callback = Callback(Events.EPOCH_STARTED(once=20), unfreeze_encoder)
+
+train_supervised(
+    ...
+    callbacks=[unfreeze_callback]
+)
+```
+
 ## JSON config validation
 
 A JSON schema can be generated to use for validation by calling `stort config schema`.
