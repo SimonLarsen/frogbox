@@ -1,7 +1,7 @@
 """@private"""
 
 import click
-from importlib.resources import path as resource_path
+import importlib.resources
 from pathlib import Path
 
 
@@ -50,10 +50,10 @@ def new(type_: str, dir_: Path, overwrite: bool = False):
     """Create a new project from template."""
 
     template_inputs = [
-        resource_path("stort.data", "train.py"),
-        resource_path("stort.data", f"config_{type_}.json"),
-        resource_path("stort.data", "example_model.py"),
-        resource_path("stort.data", "example_dataset.py"),
+        "train.py",
+        f"config_{type_}.json",
+        "example_model.py",
+        "example_dataset.py",
     ]
 
     template_outputs = [
@@ -70,13 +70,11 @@ def new(type_: str, dir_: Path, overwrite: bool = False):
                 raise RuntimeError("Project directory is not empty.")
 
     # Create folders and copy template files
-    for input_path, output_path in zip(template_inputs, template_outputs):
+    resource_files = importlib.resources.files("stort.data")
+    for input_resource, output_path in zip(template_inputs, template_outputs):
+        file_data = resource_files.joinpath(input_resource).read_text()
         output_path.parent.mkdir(exist_ok=True, parents=True)
-        with input_path.open("r") as fp:
-            file_data = fp.read()
-
-        with output_path.open("w") as fp:
-            fp.write(file_data)
+        output_path.write_text(file_data)
 
 
 if __name__ == "__main__":

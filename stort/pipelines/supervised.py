@@ -4,7 +4,6 @@ import os
 from math import ceil
 import json
 import torch
-from torch.utils.data import DataLoader
 from ignite.engine import Events, _prepare_batch
 from ignite.handlers import global_step_from_engine, Checkpoint, TerminateOnNan
 from ignite.contrib.handlers import ProgressBar, WandBLogger
@@ -15,11 +14,15 @@ from ..config import (
     create_lr_scheduler_from_config,
 )
 from ..config import Config, CheckpointMode
-from ..losses.composite import CompositeLoss
 from ..callbacks.callback import Callback, CallbackState
 from ..engines.supervised import (
     create_supervised_trainer,
     create_supervised_evaluator,
+)
+from .common import (
+    create_data_loaders,
+    create_composite_loss,
+    install_callbacks,
 )
 
 
@@ -38,7 +41,7 @@ def train_supervised(
     checkpoint: Optional[Union[str, PathLike]] = None,
     checkpoint_keys: Optional[Sequence[str]] = None,
     logging: str = "online",
-    callbacks: Sequence[Callback] = None,
+    callbacks: Optional[Sequence[Callback]] = None,
     prepare_batch: Callable = _prepare_batch,
     trainer_model_transform: Callable[[Any], Any] = lambda output: output,
     trainer_output_transform: Callable[
@@ -92,26 +95,7 @@ def train_supervised(
     log_interval = parse_log_interval(config.log_interval)
 
     # Create data loaders
-    datasets = {}
-    loaders = {}
-    for split in config.datasets.keys():
-        ds = create_object_from_config(config.datasets[split])
-        datasets[split] = ds
-
-        if split in config.loaders:
-            loaders[split] = create_object_from_config(
-                config.loaders[split],
-                dataset=ds,
-                batch_size=config.batch_size,
-                num_workers=config.loader_workers,
-            )
-        else:
-            loaders[split] = DataLoader(
-                dataset=ds,
-                batch_size=config.batch_size,
-                num_workers=config.loader_workers,
-                shuffle=split == "train",
-            )
+    datasets, loaders = create_data_loaders(config)
 
     # Create model
     model = create_object_from_config(config.model)
@@ -122,15 +106,7 @@ def train_supervised(
     )
 
     # Create loss function
-    loss_labels = []
-    loss_modules = []
-    loss_weights = []
-    for loss_label, loss_conf in config.losses.items():
-        loss_labels.append(loss_label)
-        loss_modules.append(create_object_from_config(loss_conf))
-        loss_weights.append(loss_conf.weight)
-
-    loss_fn = CompositeLoss(loss_labels, loss_modules, loss_weights).to(device)
+    loss_fn = create_composite_loss(config, device)
 
     # Create metrics
     metrics = {}
@@ -156,7 +132,8 @@ def train_supervised(
 
     # Create learning rate scheduler
     max_iterations = ceil(
-        len(datasets["train"]) / config.batch_size * config.max_epochs
+        len(datasets["train"])  # type: ignore
+        / config.batch_size * config.max_epochs
     )
     lr_scheduler = create_lr_scheduler_from_config(
         optimizer=optimizer,
@@ -224,21 +201,16 @@ def train_supervised(
 
     # Add callback functions
     if callbacks:
-        for callback in callbacks:
-
-            def _callback_handler():
-                state = CallbackState(
-                    trainer=trainer,
-                    evaluator=evaluator,
-                    datasets=datasets,
-                    loaders=loaders,
-                    model=model,
-                    config=config,
-                    device=device,
-                )
-                callback.function(state)
-
-            trainer.add_event_handler(callback.event, _callback_handler)
+        state = CallbackState(
+            trainer=trainer,
+            evaluator=evaluator,
+            datasets=datasets,
+            loaders=loaders,
+            model=model,
+            config=config,
+            device=device,
+        )
+        install_callbacks(trainer, callbacks, state)
 
     # Set up checkpoints
     to_save = {
@@ -283,10 +255,9 @@ def train_supervised(
 
     # Load checkpoints
     if checkpoint:
-        if checkpoint_keys:
-            to_load = {k: to_save[k] for k in checkpoint_keys}
-        else:
-            to_load = to_save
+        if not checkpoint_keys:
+            checkpoint_keys = list(to_save.keys())
+        to_load = {k: to_save[k] for k in checkpoint_keys}
 
         Checkpoint.load_objects(
             to_load=to_load,

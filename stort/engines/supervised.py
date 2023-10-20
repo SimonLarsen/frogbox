@@ -113,8 +113,6 @@ def create_supervised_trainer(
     trainer = (
         Engine(_update) if not deterministic else DeterministicEngine(_update)
     )
-    if scaler:
-        trainer.state.scaler = scaler
     return trainer
 
 

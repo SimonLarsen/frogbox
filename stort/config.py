@@ -10,6 +10,7 @@ import torch
 from pydantic import BaseModel, ConfigDict, field_validator
 from ignite.engine import Events, CallableEventWithFilter
 from ignite.handlers import (
+    ParamScheduler,
     CosineAnnealingScheduler,
     LinearCyclicalScheduler,
     create_lr_scheduler_with_warmup,
@@ -64,7 +65,7 @@ class ObjectDefinition(BaseModel):
     """
 
     class_name: str
-    params: Optional[Dict[str, Any]] = dict()
+    params: Optional[Dict[str, Any]] = None
 
 
 class LossDefinition(ObjectDefinition):
@@ -271,7 +272,7 @@ def create_object_from_config(config: ObjectDefinition, **kwargs) -> Any:
     >>> optimizer = create_object_from_config(config)
     """
     obj_class = get_class(config.class_name)
-    params = dict(config.params)
+    params = dict(config.params) if config.params else {}
     params.update(kwargs)
     return obj_class(**params)
 
@@ -280,12 +281,13 @@ def create_lr_scheduler_from_config(
     optimizer: torch.optim.Optimizer,
     config: LRSchedulerDefinition,
     max_iterations: int,
-) -> Any:
+) -> ParamScheduler:
     """
     Create a learning rate scheduler from dictionary configuration.
     """
     cycle_size = ceil(max_iterations / config.cycles)
 
+    lr_scheduler: ParamScheduler
     if config.type == SchedulerType.COSINE:
         lr_scheduler = CosineAnnealingScheduler(
             optimizer=optimizer,

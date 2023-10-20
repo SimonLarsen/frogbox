@@ -6,6 +6,7 @@ class CompositeLoss(torch.nn.Module):
     """
     Criterion that is a weighted sum of multiple loss functions.
     """
+
     def __init__(
         self,
         labels: Sequence[str],

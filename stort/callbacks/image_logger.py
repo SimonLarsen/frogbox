@@ -88,7 +88,7 @@ def create_image_logger(
                     y_pred = model_transform(model(x))
 
                 y_pred = y_pred.type(y.dtype)
-                x, y, y_pred = convert_tensor(
+                x, y, y_pred = convert_tensor(  # type: ignore
                     x=(x, y, y_pred),
                     device=torch.device("cpu"),
                     non_blocking=False,
@@ -114,8 +114,8 @@ def create_image_logger(
                     )
                     images.append(grid)
 
-        images = [wandb.Image(to_pil_image(image)) for image in images]
-        wandb.log(step=trainer.state.iteration, data={log_label: images})
+        wandb_images = [wandb.Image(to_pil_image(image)) for image in images]
+        wandb.log(step=trainer.state.iteration, data={log_label: wandb_images})
 
     return Callback(event, _callback)
 
