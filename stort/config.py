@@ -65,7 +65,7 @@ class ObjectDefinition(BaseModel):
     """
 
     class_name: str
-    params: Optional[Dict[str, Any]] = None
+    params: Dict[str, Any] = dict()
 
 
 class LossDefinition(ObjectDefinition):
@@ -272,7 +272,7 @@ def create_object_from_config(config: ObjectDefinition, **kwargs) -> Any:
     >>> optimizer = create_object_from_config(config)
     """
     obj_class = get_class(config.class_name)
-    params = dict(config.params) if config.params else {}
+    params = dict(config.params)
     params.update(kwargs)
     return obj_class(**params)
 
