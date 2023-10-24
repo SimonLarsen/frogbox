@@ -118,6 +118,7 @@ To enable schema validation in VSCode generate a schema and add it to your `sett
 
 ```sh
 stort config schema -o .config_schema
+mkdir -p .vscode
 cat > .vscode/settings.json << EOL
 {
     "json.schemas": [
