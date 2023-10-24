@@ -124,7 +124,7 @@ cat > .vscode/settings.json << EOL
     "json.schemas": [
         {
             "fileMatch": [
-                "/configs/*.json"
+                "/configs/**/*.json"
             ],
             "url": "./.config_schema"
         }
