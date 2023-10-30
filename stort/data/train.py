@@ -23,6 +23,12 @@ def parse_arguments(
         choices=["online", "offline", "disabled"],
         default="online",
     )
+    parser.add_argument(
+        "-t",
+        "--tags",
+        type=str,
+        nargs="+",
+    )
     return parser.parse_args(args)
 
 
@@ -35,5 +41,6 @@ if __name__ == "__main__":
         device=args.device,
         checkpoint=args.checkpoint,
         checkpoint_keys=args.checkpoint_keys,
+        tags=args.tags,
         logging=args.logging,
     )

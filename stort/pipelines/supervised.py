@@ -41,6 +41,7 @@ def train_supervised(
     checkpoint: Optional[Union[str, PathLike]] = None,
     checkpoint_keys: Optional[Sequence[str]] = None,
     logging: str = "online",
+    tags: Optional[Sequence[str]] = None,
     callbacks: Optional[Sequence[Callback]] = None,
     prepare_batch: Callable = _prepare_batch,
     trainer_model_transform: Callable[[Any], Any] = lambda output: output,
@@ -69,6 +70,8 @@ def train_supervised(
         List of keys for objects to load from checkpoint. Defaults to all keys.
     logging : str
         Logging mode. Must be either "online", "offline" or "disabled".
+    tags : list of str
+        List of tags to add to this run in W&B.
     prepare_batch : Callable
         Function that receives `batch`, `device`, `non_blocking` and outputs
         tuple of tensors `(batch_x, batch_y)`.
@@ -133,7 +136,8 @@ def train_supervised(
     # Create learning rate scheduler
     max_iterations = ceil(
         len(datasets["train"])  # type: ignore
-        / config.batch_size * config.max_epochs
+        / config.batch_size
+        * config.max_epochs
     )
     lr_scheduler = create_lr_scheduler_from_config(
         optimizer=optimizer,
@@ -159,6 +163,7 @@ def train_supervised(
     wandb_logger = WandBLogger(
         mode=logging,
         project=config.project,
+        tags=tags,
         config=dict(
             config=config.model_dump(),
             num_params=sum(p.numel() for p in model.parameters()),
