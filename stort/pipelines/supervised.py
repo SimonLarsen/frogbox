@@ -26,15 +26,6 @@ from .common import (
 )
 
 
-def _fix_metric_dtypes(data):
-    """
-    Ensure output output from evaluator has same dtype and device as input.
-    """
-    y_pred, y = data
-    y_pred = torch.as_tensor(y_pred, dtype=y.dtype, device=y.device)
-    return y_pred, y
-
-
 def train_supervised(
     config: Config,
     device: Union[str, torch.device],
@@ -114,10 +105,7 @@ def train_supervised(
     # Create metrics
     metrics = {}
     for metric_label, metric_conf in config.metrics.items():
-        metric = create_object_from_config(
-            config=metric_conf,
-            output_transform=_fix_metric_dtypes,
-        )
+        metric = create_object_from_config(metric_conf)
         metrics[metric_label] = metric
 
     # Create trainer
