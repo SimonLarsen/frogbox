@@ -47,4 +47,5 @@ if __name__ == "__main__":
         tags=args.tags,
         logging=args.logging,
         callbacks=[image_logger],
+        evaluator_output_transform=lambda x, y, y_pred: (y_pred.float(), y),
     )

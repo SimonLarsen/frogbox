@@ -122,11 +122,7 @@ def train_supervised(
     ProgressBar(desc="Train", ncols=80).attach(trainer)
 
     # Create learning rate scheduler
-    max_iterations = ceil(
-        len(datasets["train"])  # type: ignore
-        / config.batch_size
-        * config.max_epochs
-    )
+    max_iterations = len(loaders["train"]) * config.max_epochs
     lr_scheduler = create_lr_scheduler_from_config(
         optimizer=optimizer,
         config=config.lr_scheduler,
