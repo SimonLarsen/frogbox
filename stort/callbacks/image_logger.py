@@ -11,6 +11,7 @@ from ignite.engine import _prepare_batch, Events, CallableEventWithFilter
 from ignite.utils import convert_tensor
 from kornia.enhance import Denormalize
 import wandb
+import tqdm
 from .callback import Callback, CallbackState
 
 
@@ -77,8 +78,15 @@ def create_image_logger(
 
         model.eval()
 
+        pbar = tqdm.tqdm(
+            loaders[split],
+            desc="Image logger",
+            ncols=80,
+            leave=False,
+        )
+
         images = []
-        for batch in iter(loaders[split]):
+        for batch in pbar:
             x, y = prepare_batch(batch, device, non_blocking=False)
             x = input_transform(x)
             with torch.inference_mode():
