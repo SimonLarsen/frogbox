@@ -5,6 +5,7 @@ from enum import Enum
 from pathlib import Path
 from math import ceil
 from importlib import import_module
+import json
 import jinja2
 import torch
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -17,14 +18,8 @@ from ignite.handlers import (
 )
 
 
-class LogEvent(str, Enum):
-    """
-    Log event.
-    """
-
-    EPOCH_COMPLETED = "EPOCH_COMPLETED"
-    ITERATION_COMPLETED = "ITERATION_COMPLETED"
-    COMPLETED = "COMPLETED"
+class ConfigType(str, Enum):
+    SUPERVISED = "supervised"
 
 
 class CheckpointMode(str, Enum):
@@ -42,13 +37,13 @@ class LogInterval(BaseModel):
 
     Attributes
     ----------
-    event : LogEvent
+    event : Events
         Event trigger.
     interval : int
         How often event should trigger. Defaults to every time (`1`).
     """
 
-    event: LogEvent
+    event: Events
     every: int = 1
 
 
@@ -123,12 +118,28 @@ class LRSchedulerDefinition(BaseModel):
 
 class Config(BaseModel):
     """
+    Base configuration.
+
+    Attributes
+    ----------
+    type : ConfigType
+        Pipeline type.
+    project : str
+        Project name.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    type: ConfigType
+    project: str
+
+
+class SupervisedConfig(Config):
+    """
     Trainer configuration.
 
     Attributes
     ----------
-    project : str
-        Project name.
     amp : bool
         If `true` automatic mixed-precision is enabled.
     batch_size : int
@@ -145,48 +156,43 @@ class Config(BaseModel):
         with the greatest or lowest metric score.
     checkpoint_n_saved : int
         Number of checkpoints to keep.
-    log_interval : str or LogInterval
+    log_interval : Events or LogInterval
         At which interval to log metrics.
     clip_grad_norm : float
         Clip gradients to norm if provided.
     gradient_accumulation_steps : int
         Number of steps the gradients should be accumulated across.
+    datasets : dict of ObjectDefinition
+        Dataset definitions.
+    loaders : dict of ObjectDefinition
+        Data loader definitions.
     model : ObjectDefinition
         Model object definition.
     losses : dict of LossDefinition
         Loss functions.
     metrics : dict of ObjectDefinition
         Evaluation metrics.
-    datasets : dict of ObjectDefinition
-        Dataset definitions.
-    loaders : dict of ObjectDefinition
-        Data loader definitions.
     optimizer : ObjectDefinition
         Torch optimizer.
     lr_scheduler : LRSchedulerDefinition
         Learning rate scheduler.
     """
 
-    model_config = ConfigDict(extra="allow")
-
-    project: str
-    amp: bool = False
+    amp: bool = True
     batch_size: int = 32
     loader_workers: int = 0
     max_epochs: int = 32
     checkpoint_metric: Optional[str] = None
     checkpoint_mode: CheckpointMode = CheckpointMode.MAX
     checkpoint_n_saved: int = 3
-    log_interval: Union[str, LogInterval] = LogInterval(
-        event=LogEvent.EPOCH_COMPLETED, every=1
-    )
+    log_interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
     clip_grad_norm: Optional[float] = None
     gradient_accumulation_steps: int = 1
-    model: ObjectDefinition
-    losses: Dict[str, LossDefinition] = dict()
-    metrics: Dict[str, ObjectDefinition] = dict()
     datasets: Dict[str, ObjectDefinition]
     loaders: Dict[str, ObjectDefinition] = dict()
+    losses: Dict[str, LossDefinition] = dict()
+    metrics: Dict[str, ObjectDefinition] = dict()
+    model: ObjectDefinition
     optimizer: ObjectDefinition = ObjectDefinition(
         class_name="torch.optim.AdamW"
     )
@@ -207,7 +213,7 @@ class Config(BaseModel):
         return v
 
 
-def read_json_config(path: Union[str, PathLike]) -> Config:
+def read_json_config(path: Union[str, PathLike]) -> SupervisedConfig:
     """
     Read and render JSON config file and render using jinja2.
 
@@ -219,33 +225,32 @@ def read_json_config(path: Union[str, PathLike]) -> Config:
     path = Path(path)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(path.parent)))
     template = env.get_template(str(path.relative_to(path.parent)))
-    config = Config.model_validate_json(template.render())
-    return config
+    config = json.loads(template.render())
+    assert "type" in config
+    if config["type"] == "supervised":
+        return SupervisedConfig.model_validate(config)
+    else:
+        raise RuntimeError(f"Unknown config type {config['type']}.")
 
 
 def parse_log_interval(
-    s: Union[str, LogInterval]
+    e: Union[Events, LogInterval]
 ) -> Union[Events, CallableEventWithFilter]:
     """
     Create ignite event from string or dictionary configuration.
     Dictionary must have a ``event`` entry.
     """
-    if isinstance(s, str):
-        return Events[s]
-    config = dict(s)
-    for k, v in config.items():
-        if v is None:
-            del config[k]
+    if isinstance(e, Events):
+        return e
 
-    event_name = config.pop("event")
-    event = Events[event_name.value]
-
+    config = dict(e)
+    event = config.pop("event")
     if len(config) > 0:
-        return event(**config)
+        event = event(**config)
     return event
 
 
-def get_class(path: str) -> Any:
+def _get_class(path: str) -> Any:
     """
     Get class from import path.
 
@@ -271,9 +276,9 @@ def create_object_from_config(config: ObjectDefinition, **kwargs) -> Any:
     >>> config = {"class": "torch.optim.Adam", "params": {"lr": 1e-5}}
     >>> optimizer = create_object_from_config(config)
     """
-    obj_class = get_class(config.class_name)
-    params = dict(config.params)
-    params.update(kwargs)
+    obj_class = _get_class(config.class_name)
+    params = dict(kwargs)
+    params.update(config.params)
     return obj_class(**params)
 
 

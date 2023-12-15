@@ -1,17 +1,12 @@
 {
+    "type": "supervised",
     "project": "example-project",
-    "meta": {
-        "model_type": "example"
-    },
     "amp": true,
     "batch_size": 32,
     "loader_workers": 4,
     "max_epochs": 16,
     "checkpoint_metric": "PSNR",
-    "log_interval": {
-        "event": "EPOCH_COMPLETED",
-        "every": 1
-    },
+    "log_interval": "epoch_completed",
     "model": {
         "class_name": "models.example.ExampleModel",
         "params": {

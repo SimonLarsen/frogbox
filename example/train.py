@@ -2,7 +2,7 @@ from typing import Optional, Sequence
 from pathlib import Path
 import argparse
 import torch
-from stort import read_json_config, train_supervised
+from stort import read_json_config, SupervisedPipeline, Events
 from stort.callbacks import create_image_logger
 
 
@@ -24,7 +24,6 @@ def parse_arguments(
         choices=["online", "offline", "disabled"],
         default="online",
     )
-    parser.add_argument("-t", "--tags", type=str, nargs="+")
     return parser.parse_args(args)
 
 
@@ -32,19 +31,24 @@ if __name__ == "__main__":
     args = parse_arguments()
     config = read_json_config(args.config)
 
+    pipeline = SupervisedPipeline(
+        config=config,
+        device=args.device,
+        checkpoint=args.checkpoint,
+        checkpoint_keys=args.checkpoint_keys,
+    )
+
     dataset_params = config.datasets["test"].params
     image_logger = create_image_logger(
+        split="test",
         normalize_mean=dataset_params["normalize_mean"],
         normalize_std=dataset_params["normalize_std"],
         denormalize_input=dataset_params["do_normalize"],
     )
 
-    train_supervised(
-        config=config,
-        device=args.device,
-        checkpoint=args.checkpoint,
-        checkpoint_keys=args.checkpoint_keys,
-        tags=args.tags,
-        logging=args.logging,
-        callbacks=[image_logger],
+    pipeline.install_callback(
+        event=Events.EPOCH_COMPLETED,
+        callback=image_logger,
     )
+
+    pipeline.run()

@@ -1,4 +1,4 @@
-from typing import Callable, Any, Sequence, Optional, Union
+from typing import Callable, Any, Sequence, Optional
 import torch
 from torchvision.transforms.functional import (
     InterpolationMode,
@@ -7,15 +7,14 @@ from torchvision.transforms.functional import (
     to_pil_image,
 )
 from torchvision.utils import make_grid
-from ignite.engine import _prepare_batch, Events, CallableEventWithFilter
+from ignite.engine import _prepare_batch
 from ignite.utils import convert_tensor
 from kornia.enhance import Denormalize
 import wandb
-from .callback import Callback, CallbackState
+from ..pipelines.supervised import SupervisedPipeline
 
 
 def create_image_logger(
-    event: Union[Events, CallableEventWithFilter] = Events.EPOCH_COMPLETED,
     split: str = "test",
     log_label: str = "test/images",
     resize_to_fit: bool = True,
@@ -40,8 +39,6 @@ def create_image_logger(
 
     Parameters
     ----------
-    event : Ignite event
-        Event to trigger callback. Defaults to every epoch.
     split : str
         Dataset split to evaluate on. Defaults to "test".
     log_label : str
@@ -68,12 +65,12 @@ def create_image_logger(
         torch.as_tensor(normalize_std),
     )
 
-    def _callback(state: CallbackState):
-        model = state.model
-        config = state.config
-        device = state.device
-        loaders = state.loaders
-        trainer = state.trainer
+    def _callback(pipeline: SupervisedPipeline):
+        model = pipeline.model
+        config = pipeline.config
+        device = pipeline.device
+        loaders = pipeline.loaders
+        trainer = pipeline.trainer
 
         model.eval()
 
@@ -117,7 +114,7 @@ def create_image_logger(
         wandb_images = [wandb.Image(to_pil_image(image)) for image in images]
         wandb.log(step=trainer.state.iteration, data={log_label: wandb_images})
 
-    return Callback(event, _callback)
+    return _callback
 
 
 def _combine_test_images(
