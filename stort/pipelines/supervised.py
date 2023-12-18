@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Union, Sequence
 from os import PathLike
+from pathlib import Path
 from math import ceil
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -36,7 +37,11 @@ class SupervisedPipeline(Pipeline):
         device: torch.device,
         checkpoint: Optional[Union[str, PathLike]] = None,
         checkpoint_keys: Optional[Sequence[str]] = None,
+        logging: str = "online",
     ):
+        logging = logging.lower()
+        assert logging in ("online", "offline", "disabled")
+
         self.device = device
 
         # Parse config
@@ -104,12 +109,20 @@ class SupervisedPipeline(Pipeline):
 
         # Set up logging
         wandb_logger = WandBLogger(
+            mode=logging,
             resume="allow",
             project=config.project,
             config=dict(config=config.model_dump()),
         )
         self._wandb_id = wandb.run.id  # type: ignore[union-attr]
-        self._run_name = wandb.run.name  # type: ignore[union-attr]
+        if logging == "online":
+            self._run_name = wandb.run.name  # type: ignore[union-attr]
+        elif logging == "offline":
+            self._run_name = (
+                f"offline-{wandb.run.id}"  # type: ignore[union-attr]
+            )
+        else:
+            self._run_name = None
 
         wandb_logger.attach_output_handler(
             engine=self.trainer,
@@ -149,27 +162,36 @@ class SupervisedPipeline(Pipeline):
             "lr_scheduler": lr_scheduler,
         }
 
-        score_function = None
-        if config.checkpoint_metric:
-            score_function = Checkpoint.get_default_score_fn(
-                metric_name=config.checkpoint_metric,
-                score_sign=(
-                    1.0
-                    if config.checkpoint_mode == CheckpointMode.MAX
-                    else -1.0
-                ),
+        if logging != "disabled":
+            score_function = None
+            if config.checkpoint_metric:
+                score_function = Checkpoint.get_default_score_fn(
+                    metric_name=config.checkpoint_metric,
+                    score_sign=(
+                        1.0
+                        if config.checkpoint_mode == CheckpointMode.MAX
+                        else -1.0
+                    ),
+                )
+
+            checkpoint_dir = Path("checkpoints") / self._run_name
+
+            checkpoint_handler = Checkpoint(
+                to_save=to_save,
+                save_handler=str(checkpoint_dir),
+                filename_prefix="best",
+                score_name=config.checkpoint_metric,
+                score_function=score_function,
+                n_saved=config.checkpoint_n_saved,
+                global_step_transform=global_step_from_engine(self.trainer),
+            )
+            self.evaluator.add_event_handler(
+                Events.COMPLETED, checkpoint_handler
             )
 
-        checkpoint_handler = Checkpoint(
-            to_save=to_save,
-            save_handler=f"checkpoints/{self._run_name}",
-            filename_prefix="best",
-            score_name=config.checkpoint_metric,
-            score_function=score_function,
-            n_saved=config.checkpoint_n_saved,
-            global_step_transform=global_step_from_engine(self.trainer),
-        )
-        self.evaluator.add_event_handler(Events.COMPLETED, checkpoint_handler)
+            checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            with (checkpoint_dir / "config.json").open("w") as fp:
+                fp.write(config.model_dump_json(indent=2, exclude_none=True))
 
         # Load checkpoint
         if checkpoint:

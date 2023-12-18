@@ -36,6 +36,7 @@ if __name__ == "__main__":
         device=args.device,
         checkpoint=args.checkpoint,
         checkpoint_keys=args.checkpoint_keys,
+        logging=args.logging,
     )
 
     dataset_params = config.datasets["test"].params

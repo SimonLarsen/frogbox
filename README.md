@@ -20,7 +20,7 @@ pip install git+https://SimonLarsen@github.com/SimonLarsen/torch-ignite-template
 Create a new project using the `stort` CLI tool:
 
 ```sh
-stort project new -t default -d myproject
+stort project new -t supervised -d myproject
 ```
 
 See example project in [example/train.py](example/train.py).
