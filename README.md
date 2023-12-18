@@ -48,14 +48,12 @@ with torch.inference_mode():
 The simplest way to log images during training is to create an callback with `stort.callbacks.image_logger.create_image_logger`:
 
 ```python
-from stort import train_supervised
+from stort import Events
 from stort.callbacks import create_image_logger
 
-train_supervised(
-    config=config,
-    device=device,
-    checkpoint=checkpoint,
-    callbacks=[create_image_logger()]
+pipeline.install_callback(
+    event=Events.EPOCH_COMPLETED,
+    callback=create_image_logger(),
 )
 ```
 
@@ -87,48 +85,19 @@ image_logger = create_image_logger(
 
 ## Callbacks
 
-Custom callbacks can be added by creating a `stort.callbacks.Callback` object.
+Custom callbacks can be created by implementing a function that accepts the pipeline as its only argument.
 
 For instance, in the following example a callback is added to unfreeze the model's encoder after 20 epochs:
 
 ```python
 from stort import Events
-from stort.callbacks import Callback, CallbackState
 
-def unfreeze_encoder(state: CallbackState)
-    state.model.encoder.requires_grad_(True)
+def unfreeze_encoder(pipeline)
+    model = pipeline.model
+    model.encoder.requires_grad_(True)
 
-unfreeze_callback = Callback(Events.EPOCH_STARTED(once=20), unfreeze_encoder)
-
-train_supervised(
-    ...
-    callbacks=[unfreeze_callback]
+pipeline.install_callback(
+    event=Events.EPOCH_STARTED(once=20),
+    callback=unfreeze_encoder,
 )
-```
-
-## JSON config validation
-
-A JSON schema can be generated to use for validation by calling `stort config schema`.
-
-### Schema validation and completion in Visual Studio Code
-
-To enable schema validation in VSCode generate a schema and add it to your `settings.json` under `json.schemas`.
-
-**Warning: This overrides your current workspace settings.**
-
-```sh
-stort config schema -o .config_schema
-mkdir -p .vscode
-cat > .vscode/settings.json << EOL
-{
-    "json.schemas": [
-        {
-            "fileMatch": [
-                "/configs/**/*.json"
-            ],
-            "url": "./.config_schema"
-        }
-    ]
-}
-EOL
 ```
