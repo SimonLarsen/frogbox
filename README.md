@@ -33,7 +33,7 @@ Trained models can be loaded with `stort.utils.load_model_checkpoint`. The funct
 import torch
 from stort.utils import load_model_checkpoint
 
-model, config = load_model_checkpoint("checkpoints/mymodel/checkpoint.py")
+model, config = load_model_checkpoint("checkpoints/smooth-jazz-123/best_checkpoint_1_PSNR=26.6363.pt")
 
 device = torch.device("cuda:0")
 model = model.eval().to(device)
