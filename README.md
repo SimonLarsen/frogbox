@@ -12,7 +12,7 @@ Experiments are defined using JSON files and supports [jinja2](https://jinja.pal
 ## Installation
 
 ```sh
-pip install git+https://SimonLarsen@github.com/SimonLarsen/torch-ignite-template.git
+pip install git+https://SimonLarsen@github.com/SimonLarsen/stort.git
 ```
 
 ## Getting started
