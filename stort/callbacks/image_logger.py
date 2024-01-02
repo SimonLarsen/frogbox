@@ -11,6 +11,7 @@ from ignite.engine import _prepare_batch
 from ignite.utils import convert_tensor
 from kornia.enhance import Denormalize
 import wandb
+import tqdm
 from ..pipelines.supervised import SupervisedPipeline
 
 
@@ -25,6 +26,7 @@ def create_image_logger(
     normalize_std: Sequence[float] = (1.0, 1.0, 1.0),
     denormalize_input: bool = False,
     denormalize_target: bool = False,
+    progress: bool = False,
     prepare_batch: Callable = _prepare_batch,
     input_transform: Callable[[Any], Any] = lambda x: x,
     model_transform: Callable[[Any], Any] = lambda output: output,
@@ -73,6 +75,16 @@ def create_image_logger(
         trainer = pipeline.trainer
 
         model.eval()
+
+        data_iter = iter(loaders[split])
+        if progress:
+            data_iter = tqdm.tqdm(
+                data_iter,
+                desc="Images",
+                ncols=80,
+                leave=False,
+                total=len(loaders[split]),
+            )
 
         images = []
         for batch in iter(loaders[split]):
