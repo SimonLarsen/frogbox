@@ -183,7 +183,9 @@ class SupervisedPipeline(Pipeline):
                 score_name=config.checkpoint_metric,
                 score_function=score_function,
                 n_saved=config.checkpoint_n_saved,
-                global_step_transform=global_step_from_engine(self.trainer),
+                global_step_transform=global_step_from_engine(
+                    self.trainer, log_interval
+                ),
             )
             self.evaluator.add_event_handler(
                 Events.COMPLETED, checkpoint_handler
