@@ -1,10 +1,10 @@
-from typing import Dict, Optional, Union, Sequence
+from typing import Any, Dict, Optional, Union, Sequence, Callable
 from os import PathLike
 from pathlib import Path
 from math import ceil
 import torch
 from torch.utils.data import Dataset, DataLoader
-from ignite.engine import Engine, Events
+from ignite.engine import Engine, Events, _prepare_batch
 from ignite.handlers import global_step_from_engine, Checkpoint, TerminateOnNan
 from ignite.contrib.handlers import ProgressBar, WandBLogger
 import wandb
@@ -38,7 +38,54 @@ class SupervisedPipeline(Pipeline):
         checkpoint: Optional[Union[str, PathLike]] = None,
         checkpoint_keys: Optional[Sequence[str]] = None,
         logging: str = "online",
+        prepare_batch: Callable = _prepare_batch,
+        trainer_model_transform: Callable[[Any], Any] = lambda output: output,
+        trainer_output_transform: Callable[
+            [Any, Any, Any, torch.Tensor], Any
+        ] = lambda x, y, y_pred, loss: loss.item(),
+        evaluator_model_transform: Callable[
+            [Any], Any
+        ] = lambda output: output,
+        evaluator_output_transform: Callable[
+            [Any, Any, Any], Any
+        ] = lambda x, y, y_pred: (y_pred, y),
     ):
+        """
+        Create supervised pipeline.
+
+        Parameters
+        ----------
+        config : SupervisedConfig
+            Pipeline configuration.
+        device : torch.device
+            CUDA device. Can be CPU or GPU. Model will not be moved.
+        checkpoint : path-like
+            Path to experiment checkpoint.
+        checkpoint_keys : list of str
+            List of keys for objects to load from checkpoint.
+            Defaults to all keys.
+        logging : str
+            Logging mode. Must be either "online", "offline" or "disabled".
+        prepare_batch : Callable
+            Function that receives `batch`, `device`, `non_blocking` and
+            outputs tuple of tensors `(batch_x, batch_y)`.
+        trainer_model_transform : Callable
+            Function that receives the output from the model during training
+            and converts it into the form as required by the loss function.
+        trainer_output_transform : Callable
+            Function that receives `x`, `y`, `y_pred`, `loss` and returns value
+            to be assigned to trainer's `state.output` after each iteration.
+            Default is returning `loss.item()`.
+        evaluator_model_transform : Callable
+            Function that receives the output from the model during evaluation
+            and converts it into the predictions:
+            `y_pred = model_transform(model(x))`.
+        evaluator_output_transform : Callable
+            Function that receives `x`, `y`, `y_pred` and returns value to be
+            assigned to evaluator's `state.output` after each iteration.
+            Default is returning `(y_pred, y)` which fits output expected by
+            metrics.
+        """
         logging = logging.lower()
         assert logging in ("online", "offline", "disabled")
 
@@ -71,6 +118,9 @@ class SupervisedPipeline(Pipeline):
             optimizer=self.optimizer,
             loss_fn=loss_fn,
             device=device,
+            prepare_batch=prepare_batch,
+            model_transform=trainer_model_transform,
+            output_transform=trainer_output_transform,
         )
         self.trainer.add_event_handler(
             Events.ITERATION_COMPLETED, TerminateOnNan()
@@ -100,6 +150,9 @@ class SupervisedPipeline(Pipeline):
             model=self.model,
             metrics=metrics,
             device=device,
+            prepare_batch=prepare_batch,
+            model_transform=evaluator_model_transform,
+            output_transform=evaluator_output_transform,
         )
         ProgressBar(desc="Val", ncols=80).attach(self.evaluator)
 

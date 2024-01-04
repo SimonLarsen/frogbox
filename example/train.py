@@ -37,6 +37,7 @@ if __name__ == "__main__":
         checkpoint=args.checkpoint,
         checkpoint_keys=args.checkpoint_keys,
         logging=args.logging,
+        evaluator_model_transform=lambda y_pred: y_pred.float(),
     )
 
     dataset_params = config.datasets["test"].params

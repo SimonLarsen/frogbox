@@ -84,17 +84,15 @@ def new(type_: str, dir_: Path, overwrite: bool = False):
         config = SupervisedConfig(
             type="supervised",
             project="example",
-            model=ObjectDefinition(
-                class_name="models.example.ExampleModel"
-            ),
+            model=ObjectDefinition(class_name="models.example.ExampleModel"),
             datasets={
                 "train": ObjectDefinition(
                     class_name="datasets.example.ExampleDataset"
                 ),
                 "val": ObjectDefinition(
                     class_name="datasets.example.ExampleDataset"
-                )
-            }
+                ),
+            },
         )
         config_json = config.model_dump_json(indent=2, exclude_none=True)
     else:
