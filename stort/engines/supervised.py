@@ -173,14 +173,10 @@ def create_supervised_evaluator(
             x, y = prepare_batch(
                 batch, device=device, non_blocking=non_blocking
             )
+
             with torch.autocast(device_type=device.type, enabled=config.amp):
                 output = model(x)
                 y_pred = model_transform(output)
-
-            if y_pred.dtype != y.dtype:
-                y_pred = torch.as_tensor(
-                    y_pred, dtype=y.dtype, device=y.device
-                )
 
             return output_transform(x, y, y_pred)
 
