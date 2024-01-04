@@ -46,6 +46,7 @@ if __name__ == "__main__":
         normalize_mean=dataset_params["normalize_mean"],
         normalize_std=dataset_params["normalize_std"],
         denormalize_input=dataset_params["do_normalize"],
+        model_transform=lambda y_pred: y_pred.float(),
     )
 
     pipeline.install_callback(

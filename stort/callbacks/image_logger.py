@@ -96,7 +96,6 @@ def create_image_logger(
                 ):
                     y_pred = model_transform(model(x))
 
-                y_pred = y_pred.type(y.dtype)
                 x, y, y_pred = convert_tensor(  # type: ignore
                     x=(x, y, y_pred),
                     device=torch.device("cpu"),
