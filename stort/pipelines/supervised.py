@@ -237,7 +237,7 @@ class SupervisedPipeline(Pipeline):
                 score_function=score_function,
                 n_saved=config.checkpoint_n_saved,
                 global_step_transform=global_step_from_engine(
-                    self.trainer, log_interval
+                    self.trainer, Events(log_interval.value)
                 ),
             )
             self.evaluator.add_event_handler(
