@@ -5,7 +5,7 @@ from pathlib import Path
 import json
 import importlib.resources
 import click
-from .config import Config, read_json_config
+from .config import read_json_config, SupervisedConfig, ObjectDefinition
 
 
 @click.group()
@@ -27,9 +27,9 @@ def project():
     "--type",
     "-t",
     "type_",
-    type=click.Choice(["default", "minimal", "full"]),
-    default="default",
-    help="Configuration template type.",
+    type=click.Choice(["supervised"]),
+    default="supervised",
+    help="Pipeline type.",
 )
 @click.option(
     "--dir",
@@ -53,22 +53,22 @@ def new(type_: str, dir_: Path, overwrite: bool = False):
     """Create a new project from template."""
 
     template_inputs = [
-        "train.py",
-        f"config_{type_}.json",
-        "example_model.py",
-        "example_dataset.py",
+        f"train_{type_}.py",
+        "model.py",
+        "dataset.py",
     ]
 
     template_outputs = [
         dir_ / "train.py",
-        dir_ / "configs" / "example.json",
         dir_ / "models" / "example.py",
         dir_ / "datasets" / "example.py",
     ]
 
+    overwrite_checks = template_outputs + [dir_ / "configs" / "example.json"]
+
     # Check if files already exist
     if not overwrite:
-        for path in template_outputs:
+        for path in overwrite_checks:
             if path.exists():
                 raise RuntimeError("Project directory is not empty.")
 
@@ -78,6 +78,29 @@ def new(type_: str, dir_: Path, overwrite: bool = False):
         file_data = resource_files.joinpath(input_resource).read_text()
         output_path.parent.mkdir(exist_ok=True, parents=True)
         output_path.write_text(file_data)
+
+    # Create config template
+    if type_ == "supervised":
+        config = SupervisedConfig(
+            type="supervised",
+            project="example",
+            model=ObjectDefinition(class_name="models.example.ExampleModel"),
+            datasets={
+                "train": ObjectDefinition(
+                    class_name="datasets.example.ExampleDataset"
+                ),
+                "val": ObjectDefinition(
+                    class_name="datasets.example.ExampleDataset"
+                ),
+            },
+        )
+        config_json = config.model_dump_json(indent=2, exclude_none=True)
+    else:
+        raise RuntimeError(f"Unknown pipeline type {type_}.")
+
+    output_path = dir_ / "configs" / "example.json"
+    output_path.parent.mkdir(exist_ok=True, parents=True)
+    output_path.write_text(config_json)
 
 
 @cli.group()
@@ -106,6 +129,14 @@ def validate(path: Path):
 
 @config.command()
 @click.option(
+    "--type",
+    "-t",
+    "type_",
+    type=click.Choice(["supervised"]),
+    default="supervised",
+    help="Pipeline type.",
+)
+@click.option(
     "--out",
     "-o",
     type=click.Path(
@@ -116,8 +147,12 @@ def validate(path: Path):
     ),
     help="Write schema to file.",
 )
-def schema(out: Optional[Path] = None):
-    schema = json.dumps(Config.model_json_schema(), indent=2)
+def schema(type_: str, out: Optional[Path] = None):
+    if type_ == "supervised":
+        schema = json.dumps(SupervisedConfig.model_json_schema(), indent=2)
+    else:
+        raise RuntimeError(f"Unknown pipeline type {type_}.")
+
     if out:
         out.write_text(schema)
     else:

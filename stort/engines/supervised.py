@@ -3,11 +3,11 @@ import torch
 from ignite.engine.deterministic import DeterministicEngine
 from ignite.engine import Engine, _prepare_batch
 from ignite.metrics import Metric
-from ..config import Config
+from ..config import SupervisedConfig
 
 
 def create_supervised_trainer(
-    config: Config,
+    config: SupervisedConfig,
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     loss_fn: Union[Callable, torch.nn.Module],
@@ -118,7 +118,7 @@ def create_supervised_trainer(
 
 
 def create_supervised_evaluator(
-    config: Config,
+    config: SupervisedConfig,
     model: torch.nn.Module,
     metrics: Optional[Dict[str, Metric]] = None,
     device: Union[str, torch.device] = "cpu",
@@ -174,9 +174,11 @@ def create_supervised_evaluator(
             x, y = prepare_batch(
                 batch, device=device, non_blocking=non_blocking
             )
+
             with torch.autocast(device_type=device.type, enabled=config.amp):
                 output = model(x)
                 y_pred = model_transform(output)
+
             return output_transform(x, y, y_pred)
 
     evaluator = Engine(_step)

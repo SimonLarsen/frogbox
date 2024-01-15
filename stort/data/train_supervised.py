@@ -2,7 +2,7 @@ from typing import Optional, Sequence
 from pathlib import Path
 import argparse
 import torch
-from stort import read_json_config, train_supervised
+from stort import read_json_config, SupervisedPipeline
 
 
 def parse_arguments(
@@ -23,12 +23,6 @@ def parse_arguments(
         choices=["online", "offline", "disabled"],
         default="online",
     )
-    parser.add_argument(
-        "-t",
-        "--tags",
-        type=str,
-        nargs="+",
-    )
     return parser.parse_args(args)
 
 
@@ -36,11 +30,12 @@ if __name__ == "__main__":
     args = parse_arguments()
     config = read_json_config(args.config)
 
-    train_supervised(
+    pipeline = SupervisedPipeline(
         config=config,
         device=args.device,
         checkpoint=args.checkpoint,
         checkpoint_keys=args.checkpoint_keys,
-        tags=args.tags,
         logging=args.logging,
     )
+
+    pipeline.run()

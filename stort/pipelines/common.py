@@ -1,47 +1,52 @@
-from typing import Tuple, Dict, Sequence
+from typing import Tuple, Dict
 import torch
 from torch.utils.data import Dataset, DataLoader
-from ignite.engine import Engine
-from ..callbacks import Callback, CallbackState
-from ..config import Config, create_object_from_config
+from ..config import (
+    ObjectDefinition,
+    LossDefinition,
+    create_object_from_config,
+)
 from .composite_loss import CompositeLoss
 
 
 def create_data_loaders(
-    config: Config,
+    batch_size: int,
+    loader_workers: int,
+    datasets: Dict[str, ObjectDefinition],
+    loaders: Dict[str, ObjectDefinition] = dict(),
 ) -> Tuple[Dict[str, Dataset], Dict[str, DataLoader]]:
-    datasets = {}
-    loaders = {}
-    for split in config.datasets.keys():
-        ds = create_object_from_config(config.datasets[split])
-        datasets[split] = ds
+    out_datasets = {}
+    out_loaders = {}
+    for split in datasets.keys():
+        ds = create_object_from_config(datasets[split])
+        out_datasets[split] = ds
 
-        if split in config.loaders:
-            loaders[split] = create_object_from_config(
-                config.loaders[split],
+        if split in loaders:
+            out_loaders[split] = create_object_from_config(
+                loaders[split],
                 dataset=ds,
-                batch_size=config.batch_size,
-                num_workers=config.loader_workers,
+                batch_size=batch_size,
+                num_workers=loader_workers,
             )
         else:
-            loaders[split] = DataLoader(
+            out_loaders[split] = DataLoader(
                 dataset=ds,
-                batch_size=config.batch_size,
-                num_workers=config.loader_workers,
+                batch_size=batch_size,
+                num_workers=loader_workers,
                 shuffle=split == "train",
             )
 
-    return datasets, loaders
+    return out_datasets, out_loaders
 
 
 def create_composite_loss(
-    config: Config,
+    config: Dict[str, LossDefinition],
     device: torch.device,
 ) -> CompositeLoss:
     loss_labels = []
     loss_modules = []
     loss_weights = []
-    for loss_label, loss_conf in config.losses.items():
+    for loss_label, loss_conf in config.items():
         loss_labels.append(loss_label)
         loss_modules.append(create_object_from_config(loss_conf))
         loss_weights.append(loss_conf.weight)
@@ -52,16 +57,3 @@ def create_composite_loss(
         weights=loss_weights,
     ).to(device)
     return loss_fn
-
-
-def install_callbacks(
-    trainer: Engine,
-    callbacks: Sequence[Callback],
-    state: CallbackState,
-):
-    for callback in callbacks:
-        trainer.add_event_handler(
-            event_name=callback.event,
-            handler=callback,
-            state=state,
-        )
