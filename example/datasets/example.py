@@ -17,7 +17,7 @@ class ExampleDataset(Dataset):
         do_augment: bool = False,
         normalize_mean: Sequence[float] = NORMALIZE_MEAN,
         normalize_std: Sequence[float] = NORMALIZE_STD,
-        download: bool = False,
+        download: bool = True,
     ):
         super().__init__()
 

@@ -87,7 +87,7 @@ def create_image_logger(
             )
 
         images = []
-        for batch in iter(loaders[split]):
+        for batch in pbar:
             x, y = prepare_batch(batch, device, non_blocking=False)
             x = input_transform(x)
             with torch.inference_mode():

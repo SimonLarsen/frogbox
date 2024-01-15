@@ -62,6 +62,7 @@ def create_supervised_trainer(
     amp = config.amp
     clip_grad_norm = config.clip_grad_norm
     gradient_accumulation_steps = config.gradient_accumulation_steps
+    scaler = None
 
     device = torch.device(device)
     if "xla" in device.type:
