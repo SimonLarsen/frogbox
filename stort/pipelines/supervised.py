@@ -5,7 +5,12 @@ from math import ceil
 import torch
 from torch.utils.data import Dataset, DataLoader
 from ignite.engine import Engine, Events, _prepare_batch
-from ignite.handlers import global_step_from_engine, Checkpoint, TerminateOnNan
+from ignite.handlers import (
+    global_step_from_engine,
+    Checkpoint,
+    TerminateOnNan,
+    DiskSaver,
+)
 from ignite.contrib.handlers import ProgressBar, WandBLogger
 import wandb
 from .pipeline import Pipeline
@@ -38,6 +43,7 @@ class SupervisedPipeline(Pipeline):
         checkpoint: Optional[Union[str, PathLike]] = None,
         checkpoint_keys: Optional[Sequence[str]] = None,
         logging: str = "online",
+        wandb_id: Optional[str] = None,
         prepare_batch: Callable = _prepare_batch,
         trainer_model_transform: Callable[[Any], Any] = lambda output: output,
         trainer_output_transform: Callable[
@@ -162,6 +168,7 @@ class SupervisedPipeline(Pipeline):
 
         # Set up logging
         wandb_logger = WandBLogger(
+            id=wandb_id,
             mode=logging,
             resume="allow",
             project=config.project,
@@ -229,9 +236,14 @@ class SupervisedPipeline(Pipeline):
 
             checkpoint_dir = Path("checkpoints") / self._run_name
 
+            save_handler = DiskSaver(
+                dirname=str(checkpoint_dir),
+                create_dir=True,
+                require_empty=wandb_id is None,
+            )
             checkpoint_handler = Checkpoint(
                 to_save=to_save,
-                save_handler=str(checkpoint_dir),
+                save_handler=save_handler,
                 filename_prefix="best",
                 score_name=config.checkpoint_metric,
                 score_function=score_function,

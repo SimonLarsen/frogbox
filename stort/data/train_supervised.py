@@ -23,6 +23,7 @@ def parse_arguments(
         choices=["online", "offline", "disabled"],
         default="online",
     )
+    parser.add_argument("--wandb-id", type=str, required=False)
     return parser.parse_args(args)
 
 
@@ -36,6 +37,7 @@ if __name__ == "__main__":
         checkpoint=args.checkpoint,
         checkpoint_keys=args.checkpoint_keys,
         logging=args.logging,
+        wandb_id=args.wandb_id,
     )
 
     pipeline.run()
