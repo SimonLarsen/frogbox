@@ -25,7 +25,7 @@ class BaseService(FastAPI):
 
         @self.post("/inference")
         async def do_test(
-            request: request_class  # type: ignore
+            request: request_class,  # type: ignore
         ) -> response_class:  # type: ignore
             if not hasattr(self, "inference"):
                 raise RuntimeError("inference method not implemented.")

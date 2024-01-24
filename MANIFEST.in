@@ -1,2 +1,3 @@
 include stort/data/*.json
 include stort/data/*.py
+include stort/data/Dockerfile
