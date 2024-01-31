@@ -1,9 +1,18 @@
 from typing import Tuple, Dict
+from math import ceil
 import torch
 from torch.utils.data import Dataset, DataLoader
+from ignite.handlers import (
+    ParamScheduler,
+    CosineAnnealingScheduler,
+    LinearCyclicalScheduler,
+    create_lr_scheduler_with_warmup,
+)
 from ..config import (
     ObjectDefinition,
     LossDefinition,
+    SchedulerType,
+    LRSchedulerDefinition,
     create_object_from_config,
 )
 from .composite_loss import CompositeLoss
@@ -57,3 +66,48 @@ def create_composite_loss(
         weights=loss_weights,
     ).to(device)
     return loss_fn
+
+
+def create_lr_scheduler(
+    optimizer: torch.optim.Optimizer,
+    config: LRSchedulerDefinition,
+    max_iterations: int,
+) -> ParamScheduler:
+    """
+    Create a learning rate scheduler from dictionary configuration.
+    """
+    cycle_size = ceil(max_iterations / config.cycles)
+
+    lr_scheduler: ParamScheduler
+    if config.type == SchedulerType.COSINE:
+        lr_scheduler = CosineAnnealingScheduler(
+            optimizer=optimizer,
+            param_name="lr",
+            start_value=config.start_value,
+            end_value=config.end_value,
+            cycle_size=cycle_size,
+            start_value_mult=config.start_value_mult,
+            end_value_mult=config.end_value_mult,
+        )
+    elif config.type == SchedulerType.LINEAR:
+        lr_scheduler = LinearCyclicalScheduler(
+            optimizer=optimizer,
+            param_name="lr",
+            start_value=config.start_value,
+            end_value=config.end_value,
+            cycle_size=cycle_size,
+            start_value_mult=config.start_value_mult,
+            end_value_mult=config.end_value_mult,
+        )
+    else:
+        raise RuntimeError(f'Unsupported LR scheduler "{config.type}".')
+
+    if config.warmup_steps > 0:
+        lr_scheduler = create_lr_scheduler_with_warmup(
+            lr_scheduler=lr_scheduler,
+            warmup_start_value=0.0,
+            warmup_end_value=config.start_value,
+            warmup_duration=config.warmup_steps,
+        )
+
+    return lr_scheduler

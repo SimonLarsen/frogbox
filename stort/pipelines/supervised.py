@@ -5,36 +5,35 @@ from math import ceil
 import torch
 from torch.utils.data import Dataset, DataLoader
 from ignite.engine import Engine, Events, _prepare_batch
-from ignite.handlers import (
-    global_step_from_engine,
-    Checkpoint,
-    TerminateOnNan,
-    DiskSaver,
-)
-from ignite.contrib.handlers import ProgressBar, WandBLogger
+from ignite.handlers import global_step_from_engine
+from ignite.contrib.handlers import ProgressBar
 import wandb
 from .pipeline import Pipeline
-from .common import create_data_loaders, create_composite_loss
+from .common import (
+    create_data_loaders,
+    create_composite_loss,
+    create_lr_scheduler,
+)
 from ..config import (
     SupervisedConfig,
-    CheckpointMode,
     create_object_from_config,
     parse_log_interval,
-    create_lr_scheduler_from_config,
 )
 from ..engines.supervised import (
     create_supervised_trainer,
     create_supervised_evaluator,
 )
+from .composite_loss import CompositeLoss
 
 
 class SupervisedPipeline(Pipeline):
     config: SupervisedConfig
     evaluator: Engine
-    model: torch.nn.Module
-    optimizer: torch.optim.Optimizer
     datasets: Dict[str, Dataset]
     loaders: Dict[str, DataLoader]
+    model: torch.nn.Module
+    loss_fn: CompositeLoss
+    optimizer: torch.optim.Optimizer
 
     def __init__(
         self,
@@ -42,6 +41,7 @@ class SupervisedPipeline(Pipeline):
         device: torch.device,
         checkpoint: Optional[Union[str, PathLike]] = None,
         checkpoint_keys: Optional[Sequence[str]] = None,
+        checkpoint_dir: Union[str, PathLike] = Path("checkpoints"),
         logging: str = "online",
         wandb_id: Optional[str] = None,
         prepare_batch: Callable = _prepare_batch,
@@ -70,8 +70,10 @@ class SupervisedPipeline(Pipeline):
         checkpoint_keys : list of str
             List of keys for objects to load from checkpoint.
             Defaults to all keys.
+        checkpoint_dir : str or path
+            Path to directory to store checkpoints.
         logging : str
-            Logging mode. Must be either "online", "offline" or "disabled".
+            Logging mode. Must be either "online" or "offline".
         prepare_batch : Callable
             Function that receives `batch`, `device`, `non_blocking` and
             outputs tuple of tensors `(batch_x, batch_y)`.
@@ -93,7 +95,7 @@ class SupervisedPipeline(Pipeline):
             metrics.
         """
         logging = logging.lower()
-        assert logging in ("online", "offline", "disabled")
+        assert logging in ("online", "offline")
 
         self.device = device
 
@@ -117,19 +119,16 @@ class SupervisedPipeline(Pipeline):
         )
 
         # Create trainer
-        loss_fn = create_composite_loss(config.losses, device)
+        self.loss_fn = create_composite_loss(config.losses, device)
         self.trainer = create_supervised_trainer(
             config=config,
             model=self.model,
             optimizer=self.optimizer,
-            loss_fn=loss_fn,
+            loss_fn=self.loss_fn,
             device=device,
             prepare_batch=prepare_batch,
             model_transform=trainer_model_transform,
             output_transform=trainer_output_transform,
-        )
-        self.trainer.add_event_handler(
-            Events.ITERATION_COMPLETED, TerminateOnNan()
         )
         ProgressBar(desc="Train", ncols=80).attach(self.trainer)
 
@@ -139,7 +138,7 @@ class SupervisedPipeline(Pipeline):
             / config.batch_size
             * config.max_epochs
         )
-        lr_scheduler = create_lr_scheduler_from_config(
+        lr_scheduler = create_lr_scheduler(
             optimizer=self.optimizer,
             config=config.lr_scheduler,
             max_iterations=max_iterations,
@@ -162,43 +161,26 @@ class SupervisedPipeline(Pipeline):
         )
         ProgressBar(desc="Val", ncols=80).attach(self.evaluator)
 
-        @self.trainer.on(log_interval)
-        def _log_validation():
-            self.evaluator.run(self.loaders["val"])
+        self.trainer.add_event_handler(
+            event_name=log_interval,
+            handler=lambda: self.evaluator.run(self.loaders["val"]),
+        )
 
         # Set up logging
-        wandb_logger = WandBLogger(
-            id=wandb_id,
-            mode=logging,
-            resume="allow",
-            project=config.project,
-            config=dict(config=config.model_dump()),
-        )
-        self._wandb_id = wandb.run.id  # type: ignore[union-attr]
-        if logging == "online":
-            self._run_name = wandb.run.name  # type: ignore[union-attr]
-        elif logging == "offline":
-            self._run_name = (
-                f"offline-{wandb.run.id}"  # type: ignore[union-attr]
-            )
-        else:
-            self._run_name = None
-
-        wandb_logger.attach_output_handler(
+        self._setup_logger(wandb_id, logging)
+        self.logger.attach_output_handler(
             engine=self.trainer,
             event_name=Events.ITERATION_COMPLETED,
             tag="train",
             output_transform=lambda loss: {"loss": loss},
         )
-
-        wandb_logger.attach_opt_params_handler(
+        self.logger.attach_opt_params_handler(
             engine=self.trainer,
             event_name=Events.ITERATION_COMPLETED,
             optimizer=self.optimizer,
             param_name="lr",
         )
-
-        wandb_logger.attach_output_handler(
+        self.logger.attach_output_handler(
             engine=self.evaluator,
             event_name=Events.COMPLETED,
             tag="val",
@@ -210,8 +192,8 @@ class SupervisedPipeline(Pipeline):
 
         @self.trainer.on(Events.ITERATION_COMPLETED)
         def log_losses(trainer):
-            labels = ["loss/" + label for label in loss_fn.labels]
-            losses = dict(zip(labels, loss_fn.last_values))
+            labels = ["loss/" + label for label in self.loss_fn.labels]
+            losses = dict(zip(labels, self.loss_fn.last_values))
             wandb.log(step=trainer.state.iteration, data=losses)
 
         # Set up checkpoints
@@ -222,54 +204,12 @@ class SupervisedPipeline(Pipeline):
             "lr_scheduler": lr_scheduler,
         }
 
-        if logging != "disabled":
-            score_function = None
-            if config.checkpoint_metric:
-                score_function = Checkpoint.get_default_score_fn(
-                    metric_name=config.checkpoint_metric,
-                    score_sign=(
-                        1.0
-                        if config.checkpoint_mode == CheckpointMode.MAX
-                        else -1.0
-                    ),
-                )
-
-            checkpoint_dir = Path("checkpoints") / self._run_name
-
-            save_handler = DiskSaver(
-                dirname=str(checkpoint_dir),
-                create_dir=True,
-                require_empty=wandb_id is None,
-            )
-            checkpoint_handler = Checkpoint(
-                to_save=to_save,
-                save_handler=save_handler,
-                filename_prefix="best",
-                score_name=config.checkpoint_metric,
-                score_function=score_function,
-                n_saved=config.checkpoint_n_saved,
-                global_step_transform=global_step_from_engine(
-                    self.trainer, Events(log_interval.value)
-                ),
-            )
-            self.evaluator.add_event_handler(
-                Events.COMPLETED, checkpoint_handler
-            )
-
-            checkpoint_dir.mkdir(parents=True, exist_ok=True)
-            with (checkpoint_dir / "config.json").open("w") as fp:
-                fp.write(config.model_dump_json(indent=2, exclude_none=True))
+        self._setup_checkpoint(to_save, checkpoint_dir)
+        self.evaluator.add_event_handler(Events.COMPLETED, self.checkpoint)
 
         # Load checkpoint
         if checkpoint:
-            if not checkpoint_keys:
-                checkpoint_keys = list(to_save.keys())
-            to_load = {k: to_save[k] for k in checkpoint_keys}
-
-            Checkpoint.load_objects(
-                to_load=to_load,
-                checkpoint=torch.load(str(checkpoint), "cpu"),
-            )
+            self._load_checkpoint(checkpoint, checkpoint_keys)
 
     def run(self) -> None:
         self.trainer.run(

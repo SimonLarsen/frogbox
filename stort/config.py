@@ -3,19 +3,11 @@ from os import PathLike
 import warnings
 from enum import Enum
 from pathlib import Path
-from math import ceil
 from importlib import import_module
 import json
 import jinja2
-import torch
 from pydantic import BaseModel, ConfigDict, field_validator
 from ignite.engine import Events, CallableEventWithFilter
-from ignite.handlers import (
-    ParamScheduler,
-    CosineAnnealingScheduler,
-    LinearCyclicalScheduler,
-    create_lr_scheduler_with_warmup,
-)
 
 
 class ConfigType(str, Enum):
@@ -126,12 +118,25 @@ class Config(BaseModel):
         Pipeline type.
     project : str
         Project name.
+    checkpoint_metric : str
+        Name of metric to use for evaluating checkpoints.
+    checkpoint_mode : CheckpointMode
+        Either `min` or `max`. Determines whether to keep the checkpoints
+        with the greatest or lowest metric score.
+    checkpoint_n_saved : int
+        Number of checkpoints to keep.
+    log_interval : Events or LogInterval
+        At which interval to log metrics.
     """
 
     model_config = ConfigDict(extra="allow")
 
     type: ConfigType
     project: str
+    checkpoint_metric: Optional[str] = None
+    checkpoint_mode: CheckpointMode = CheckpointMode.MAX
+    checkpoint_n_saved: int = 3
+    log_interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
 
 
 class SupervisedConfig(Config):
@@ -149,15 +154,6 @@ class SupervisedConfig(Config):
         `0` means the data will be loaded in the main process.
     max_epochs : int
         Maximum number of epochs to train for.
-    checkpoint_metric : str
-        Name of metric to use for evaluating checkpoints.
-    checkpoint_mode : CheckpointMode
-        Either `min` or `max`. Determines whether to keep the checkpoints
-        with the greatest or lowest metric score.
-    checkpoint_n_saved : int
-        Number of checkpoints to keep.
-    log_interval : Events or LogInterval
-        At which interval to log metrics.
     clip_grad_norm : float
         Clip gradients to norm if provided.
     gradient_accumulation_steps : int
@@ -182,10 +178,6 @@ class SupervisedConfig(Config):
     batch_size: int = 32
     loader_workers: int = 0
     max_epochs: int = 32
-    checkpoint_metric: Optional[str] = None
-    checkpoint_mode: CheckpointMode = CheckpointMode.MAX
-    checkpoint_n_saved: int = 3
-    log_interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
     clip_grad_norm: Optional[float] = None
     gradient_accumulation_steps: int = 1
     datasets: Dict[str, ObjectDefinition]
@@ -280,48 +272,3 @@ def create_object_from_config(config: ObjectDefinition, **kwargs) -> Any:
     params = dict(kwargs)
     params.update(config.params)
     return obj_class(**params)
-
-
-def create_lr_scheduler_from_config(
-    optimizer: torch.optim.Optimizer,
-    config: LRSchedulerDefinition,
-    max_iterations: int,
-) -> ParamScheduler:
-    """
-    Create a learning rate scheduler from dictionary configuration.
-    """
-    cycle_size = ceil(max_iterations / config.cycles)
-
-    lr_scheduler: ParamScheduler
-    if config.type == SchedulerType.COSINE:
-        lr_scheduler = CosineAnnealingScheduler(
-            optimizer=optimizer,
-            param_name="lr",
-            start_value=config.start_value,
-            end_value=config.end_value,
-            cycle_size=cycle_size,
-            start_value_mult=config.start_value_mult,
-            end_value_mult=config.end_value_mult,
-        )
-    elif config.type == SchedulerType.LINEAR:
-        lr_scheduler = LinearCyclicalScheduler(
-            optimizer=optimizer,
-            param_name="lr",
-            start_value=config.start_value,
-            end_value=config.end_value,
-            cycle_size=cycle_size,
-            start_value_mult=config.start_value_mult,
-            end_value_mult=config.end_value_mult,
-        )
-    else:
-        raise RuntimeError(f'Unsupported LR scheduler "{config.type}".')
-
-    if config.warmup_steps > 0:
-        lr_scheduler = create_lr_scheduler_with_warmup(
-            lr_scheduler=lr_scheduler,
-            warmup_start_value=0.0,
-            warmup_end_value=config.start_value,
-            warmup_duration=config.warmup_steps,
-        )
-
-    return lr_scheduler

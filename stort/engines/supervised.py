@@ -1,7 +1,8 @@
 from typing import Union, Callable, Any, Sequence, Tuple, Optional, Dict
 import torch
 from ignite.engine.deterministic import DeterministicEngine
-from ignite.engine import Engine, _prepare_batch
+from ignite.engine import Engine, Events, _prepare_batch
+from ignite.handlers import TerminateOnNan
 from ignite.metrics import Metric
 from ..config import SupervisedConfig
 
@@ -19,6 +20,7 @@ def create_supervised_trainer(
         [Any, Any, Any, torch.Tensor], Any
     ] = lambda x, y, y_pred, loss: loss.item(),
     deterministic: bool = False,
+    terminate_on_nan: bool = True,
 ) -> Engine:
     """
     Factory function for supervised trainer.
@@ -53,6 +55,8 @@ def create_supervised_trainer(
         iteration. Default is returning `loss.item()`.
     deterministic : bool
         If `True`, returns `DeterministicEngine`, otherwise `Engine`.
+    terminate_on_nan: bool
+        Terminate training if model outputs NaN or infinite.
 
     Returns
     -------
@@ -114,6 +118,13 @@ def create_supervised_trainer(
     trainer = (
         Engine(_update) if not deterministic else DeterministicEngine(_update)
     )
+
+    if terminate_on_nan:
+        trainer.add_event_handler(
+            event_name=Events.ITERATION_COMPLETED,
+            handler=TerminateOnNan(),
+        )
+
     return trainer
 
 
