@@ -220,6 +220,16 @@ def serve(checkpoints: Sequence[Tuple[str, Path]], device: str):
     metavar="NAME PATH",
 )
 @click.option(
+    "--requirements",
+    "-r",
+    type=click.Path(
+        exists=True, file_okay=True, dir_okay=False, path_type=Path
+    ),
+    default="requirements.txt",
+    help="Path to service requirements.txt. Defaults to requirements.txt.",
+    metavar="PATH",
+)
+@click.option(
     "--out",
     "-o",
     type=click.Path(
@@ -232,8 +242,10 @@ def serve(checkpoints: Sequence[Tuple[str, Path]], device: str):
 )
 def service_dockerfile(
     checkpoints: Sequence[Tuple[str, Path]],
+    requirements: Path,
     out: Optional[Path] = None,
 ):
+    """Build service Dockerfile."""
     from jinja2 import Environment, PackageLoader
 
     env = Environment(
@@ -257,6 +269,7 @@ def service_dockerfile(
     env_checkpoints = {e["name"]: str(e["model_path"]) for e in ckpt_info}
     output = template.render(
         checkpoints=ckpt_info,
+        requirements=str(requirements),
         env_checkpoints=json.dumps(env_checkpoints),
     )
 

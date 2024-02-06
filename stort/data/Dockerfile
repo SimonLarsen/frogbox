@@ -11,7 +11,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y git
 
 COPY service.py ./
-COPY requirements.txt ./
+COPY {{ requirements }} ./requirements.txt
 COPY models/* ./models/
 
 RUN pip install -r requirements.txt
