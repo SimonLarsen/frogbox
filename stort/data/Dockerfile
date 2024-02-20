@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y git
 
 COPY service.py ./
 COPY {{ requirements }} ./requirements.txt
-COPY models/* ./models/
+COPY models ./models
 
 RUN pip install -r requirements.txt
 RUN pip install -U uvicorn
