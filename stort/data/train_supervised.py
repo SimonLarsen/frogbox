@@ -24,6 +24,8 @@ def parse_arguments(
         default="online",
     )
     parser.add_argument("--wandb-id", type=str, required=False)
+    parser.add_argument("--tags", type=str, nargs="+")
+    parser.add_argument("--group", type=str)
     return parser.parse_args(args)
 
 
@@ -38,6 +40,8 @@ if __name__ == "__main__":
         checkpoint_keys=args.checkpoint_keys,
         logging=args.logging,
         wandb_id=args.wandb_id,
+        tags=args.tags,
+        group=args.group,
     )
 
     pipeline.run()

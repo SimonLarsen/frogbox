@@ -44,6 +44,8 @@ class SupervisedPipeline(Pipeline):
         checkpoint_dir: Union[str, PathLike] = Path("checkpoints"),
         logging: str = "online",
         wandb_id: Optional[str] = None,
+        tags: Optional[Sequence[str]] = None,
+        group: Optional[str] = None,
         prepare_batch: Callable = _prepare_batch,
         trainer_model_transform: Callable[[Any], Any] = lambda output: output,
         trainer_output_transform: Callable[
@@ -74,6 +76,12 @@ class SupervisedPipeline(Pipeline):
             Path to directory to store checkpoints.
         logging : str
             Logging mode. Must be either "online" or "offline".
+        wandb_id : str
+            W&B run ID to resume from.
+        tags : list of str
+            List of tags to add to the run in W&B.
+        group : str
+            Group to add run to in W&B.
         prepare_batch : Callable
             Function that receives `batch`, `device`, `non_blocking` and
             outputs tuple of tensors `(batch_x, batch_y)`.
@@ -167,7 +175,7 @@ class SupervisedPipeline(Pipeline):
         )
 
         # Set up logging
-        self._setup_logger(wandb_id, logging)
+        self._setup_logger(wandb_id, logging, tags, group)
         self.logger.attach_output_handler(
             engine=self.trainer,
             event_name=Events.ITERATION_COMPLETED,

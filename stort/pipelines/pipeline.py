@@ -26,6 +26,8 @@ class Pipeline(ABC):
         self,
         wandb_id: Optional[str],
         mode: Optional[str] = "online",
+        tags: Optional[Sequence[str]] = None,
+        group: Optional[str] = None,
     ) -> None:
         assert mode in (
             "online",
@@ -35,6 +37,8 @@ class Pipeline(ABC):
         self.logger = WandBLogger(
             id=wandb_id,
             mode=mode,
+            tags=tags,
+            group=group,
             resume="allow" if mode == "online" else None,
             project=self.config.project,
             config=dict(config=self.config.model_dump()),
