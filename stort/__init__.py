@@ -1,7 +1,7 @@
 """
 .. include:: ../README.md
 """
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 from .pipelines.supervised import SupervisedPipeline  # noqa: F401
 from .config import read_json_config  # noqa: F401
