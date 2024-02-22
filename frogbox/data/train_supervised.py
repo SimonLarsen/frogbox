@@ -2,7 +2,7 @@ from typing import Optional, Sequence
 from pathlib import Path
 import argparse
 import torch
-from stort import read_json_config, SupervisedPipeline
+from frogbox import read_json_config, SupervisedPipeline
 
 
 def parse_arguments(

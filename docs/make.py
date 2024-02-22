@@ -9,9 +9,11 @@ if __name__ == "__main__":
         docformat="numpy",
         include_undocumented=True,
         show_source=True,
+        template_directory="./docs/template",
+        logo="/frogbox/logo.png",
     )
 
     pdoc.pdoc(
-        "stort",
+        "frogbox",
         output_directory=here,
     )

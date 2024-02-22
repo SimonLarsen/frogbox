@@ -2,8 +2,8 @@ from typing import Optional, Sequence
 from pathlib import Path
 import argparse
 import torch
-from stort import read_json_config, SupervisedPipeline, Events
-from stort.callbacks import create_image_logger
+from frogbox import read_json_config, SupervisedPipeline, Events
+from frogbox.callbacks import create_image_logger
 
 
 def parse_arguments(

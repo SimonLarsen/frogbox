@@ -3,7 +3,7 @@ from kornia.augmentation import Normalize
 import torch
 from torchvision.io import read_image, ImageReadMode, write_jpeg
 from torchvision.transforms.functional import convert_image_dtype
-from stort.service import BaseService
+from frogbox.service import BaseService
 
 
 class Request(BaseModel):

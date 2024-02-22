@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from stort.service import BaseService
+from frogbox.service import BaseService
 
 
 class Request(BaseModel):

@@ -162,7 +162,7 @@ cython_debug/
 # pdoc
 docs/*.html
 docs/*.js
-docs/stort/
+docs/frogbox/
 
 # Example data
 example/wandb/

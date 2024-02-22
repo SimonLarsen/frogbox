@@ -9,7 +9,7 @@ if __name__ == "__main__":
     # Read package version
     version = re.search(
         r'__version__ = "(.+?)"',
-        (here / "stort" / "__init__.py").read_text("utf8"),
+        (here / "frogbox" / "__init__.py").read_text("utf8"),
     ).group(1)
 
     # Read requirements from requirements.txt
@@ -18,8 +18,8 @@ if __name__ == "__main__":
     )
 
     setup(
-        name="stort",
-        description="A simple Torch trainer.",
+        name="frogbox",
+        description="An opinionated machine learning framework.",
         version=version,
         author="Simon J. Larsen",
         author_email="simonhffh@gmail.com",
@@ -27,5 +27,5 @@ if __name__ == "__main__":
         packages=find_packages(),
         include_package_data=True,
         install_requires=requirements,
-        entry_points={"console_scripts": ["stort=stort.cli:cli"]},
+        entry_points={"console_scripts": ["frogbox=frogbox.cli:cli"]},
     )

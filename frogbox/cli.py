@@ -76,7 +76,7 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
                 )
 
     # Create folders and copy template files
-    resource_files = importlib.resources.files("stort.data")
+    resource_files = importlib.resources.files("frogbox.data")
     for input_resource, output_path in zip(template_inputs, template_outputs):
         file_data = resource_files.joinpath(input_resource).read_text()
         output_path.parent.mkdir(exist_ok=True, parents=True)
@@ -154,7 +154,7 @@ def new_service(dir_: Path, overwrite: bool = False):
                 )
 
     # Create folders and copy template files
-    resource_files = importlib.resources.files("stort.data")
+    resource_files = importlib.resources.files("frogbox.data")
     for input_resource, output_path in zip(template_inputs, template_outputs):
         file_data = resource_files.joinpath(input_resource).read_text()
         output_path.parent.mkdir(exist_ok=True, parents=True)
@@ -249,7 +249,7 @@ def service_dockerfile(
     from jinja2 import Environment, PackageLoader
 
     env = Environment(
-        loader=PackageLoader("stort", "data"),
+        loader=PackageLoader("frogbox", "data"),
         autoescape=False,
     )
     template = env.get_template("Dockerfile")

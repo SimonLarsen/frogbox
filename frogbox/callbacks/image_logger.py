@@ -1,11 +1,11 @@
 """
-## Logging images
+# Logging images
 
-The simplest way to log images during training is to create an callback with `stort.callbacks.image_logger.create_image_logger`:
+The simplest way to log images during training is to create an callback with `frogbox.callbacks.image_logger.create_image_logger`:
 
 ```python
-from stort import Events
-from stort.callbacks import create_image_logger
+from frogbox import Events
+from frogbox.callbacks import create_image_logger
 
 pipeline.install_callback(
     event=Events.EPOCH_COMPLETED,

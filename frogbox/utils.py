@@ -1,11 +1,11 @@
 """
-## Loading a trained model
+# Loading a trained model
 
-Trained models can be loaded with `stort.utils.load_model_checkpoint`. The function returns the trained model as well the trainer configuration.
+Trained models can be loaded with `frogbox.utils.load_model_checkpoint`. The function returns the trained model as well the trainer configuration.
 
 ```python
 import torch
-from stort.utils import load_model_checkpoint
+from frogbox.utils import load_model_checkpoint
 
 device = torch.device("cuda:0")
 

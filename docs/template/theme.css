@@ -1,0 +1,20 @@
+:root {
+    --pdoc-background: #1a1a1a;
+}
+
+.pdoc {
+    --text: #f7f7f7;
+    --muted: #9d9d9d;
+    --link: #4bbf73;
+    --link-hover: #40a262;
+    --code: #333;
+    --active: #444;
+
+    --accent: #282e33;
+    --accent2: #555;
+
+    --nav-hover: rgba(0, 0, 0, 0.1);
+    --name: #4bbf73;
+    --def: #1f9bcf;
+    --annotation: #1f9bcf;
+}
