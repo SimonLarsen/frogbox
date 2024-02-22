@@ -1,3 +1,24 @@
+"""
+## Loading a trained model
+
+Trained models can be loaded with `stort.utils.load_model_checkpoint`. The function returns the trained model as well the trainer configuration.
+
+```python
+import torch
+from stort.utils import load_model_checkpoint
+
+device = torch.device("cuda:0")
+
+model, config = load_model_checkpoint(
+    "checkpoints/smooth-jazz-123/best_checkpoint_1_PSNR=26.6363.pt"
+)
+model = model.eval().to(device)
+
+x = torch.rand((1, 3, 16, 16), device=device)
+with torch.inference_mode():
+    pred = model(x)
+```
+"""
 from typing import Union, Tuple
 from os import PathLike
 from pathlib import Path

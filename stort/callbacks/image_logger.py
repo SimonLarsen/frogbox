@@ -1,3 +1,44 @@
+"""
+## Logging images
+
+The simplest way to log images during training is to create an callback with `stort.callbacks.image_logger.create_image_logger`:
+
+```python
+from stort import Events
+from stort.callbacks import create_image_logger
+
+pipeline.install_callback(
+    event=Events.EPOCH_COMPLETED,
+    callback=create_image_logger(),
+)
+```
+
+Images can automatically be denormalized by setting `denormalize_input`/`denormalize_output` and providing the mean and standard deviation used for normalization.
+
+For instance, if input images are normalized with ImageNet parameters and outputs are in [0, 1]:
+
+```python
+image_logger = create_image_logger(
+    normalize_mean=[0.485, 0.456, 0.406],
+    normalize_std=[0.229, 0.224, 0.225],
+    denormalize_input=True,
+)
+```
+
+More advanced transformations can be made by overriding `input_transform`, `model_transform`, or `output_transform`:
+
+```python
+from torchvision.transforms.functional import hflip
+
+def flip_input(x, y, y_pred):
+    x = hflip(x)
+    return x, y_pred, y
+
+image_logger = create_image_logger(
+    output_transform=flip_input,
+)
+```
+"""
 from typing import Callable, Any, Sequence, Optional
 import torch
 from torchvision.transforms.functional import (
