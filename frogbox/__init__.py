@@ -1,5 +1,5 @@
 """
-.. include:: ../README.md
+.. include:: ./intro.md
 """
 __version__ = "0.2.4b"
 
