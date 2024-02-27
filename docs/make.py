@@ -14,6 +14,6 @@ if __name__ == "__main__":
     )
 
     pdoc.pdoc(
-        "frogbox",
+        "./frogbox",
         output_directory=here,
     )
