@@ -11,7 +11,7 @@ import click
 @click.group()
 def cli():
     """
-    A simple Torch + Ignite trainer.
+    An opinionated machine learning framework.
     """
     pass
 

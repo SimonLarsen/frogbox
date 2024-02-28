@@ -17,5 +17,5 @@ pipeline.install_callback(
     callback=unfreeze_encoder,
 )
 ```
-"""
+"""  # noqa: E501
 from .image_logger import create_image_logger  # noqa: F401

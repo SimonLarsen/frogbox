@@ -1,7 +1,8 @@
 """
 # Loading a trained model
 
-Trained models can be loaded with `frogbox.utils.load_model_checkpoint`. The function returns the trained model as well the trainer configuration.
+Trained models can be loaded with `frogbox.utils.load_model_checkpoint`.
+The function returns the trained model as well the trainer configuration.
 
 ```python
 import torch
@@ -19,7 +20,7 @@ with torch.inference_mode():
     pred = model(x)
 ```
 """
-from typing import Union, Tuple
+from typing import Type, Union, Tuple
 from os import PathLike
 from pathlib import Path
 import torch
@@ -32,7 +33,7 @@ from .config import (
 
 def load_model_checkpoint(
     path: Union[str, PathLike]
-) -> Tuple[torch.nn.Module, Config]:
+) -> Tuple[torch.nn.Module, Type[Config]]:
     """
     Load model from checkpoint.
 

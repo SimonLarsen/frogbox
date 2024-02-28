@@ -1,7 +1,8 @@
 """
 # Logging images
 
-The simplest way to log images during training is to create an callback with `frogbox.callbacks.image_logger.create_image_logger`:
+The simplest way to log images during training is to create an callback with
+`frogbox.callbacks.image_logger.create_image_logger`:
 
 ```python
 from frogbox import Events
@@ -13,7 +14,8 @@ pipeline.install_callback(
 )
 ```
 
-Images can automatically be denormalized by setting `denormalize_input`/`denormalize_output` and providing the mean and standard deviation used for normalization.
+Images can automatically be denormalized by setting `denormalize_input`/`denormalize_output`
+and providing the mean and standard deviation used for normalization.
 
 For instance, if input images are normalized with ImageNet parameters and outputs are in [0, 1]:
 
@@ -38,7 +40,7 @@ image_logger = create_image_logger(
     output_transform=flip_input,
 )
 ```
-"""
+"""  # noqa: E501
 from typing import Callable, Any, Sequence, Optional
 import torch
 from torchvision.transforms.functional import (
