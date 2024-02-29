@@ -15,6 +15,7 @@ def create_supervised_trainer(
     device: Union[str, torch.device] = "cpu",
     non_blocking: bool = False,
     prepare_batch: Callable = _prepare_batch,
+    input_transform: Callable[[Any, Any], Any] = lambda x, y: (x, y),
     model_transform: Callable[[Any], Any] = lambda output: output,
     output_transform: Callable[
         [Any, Any, Any, torch.Tensor], Any
@@ -46,6 +47,9 @@ def create_supervised_trainer(
     prepare_batch : Callable
         Function that receives `batch`, `device`, `non_blocking`
         and outputs tuple of tensors `(batch_x, batch_y)`.
+    input_transform : Callable
+        Function that receives tensors `y` and `y` and outputs tuple of
+        tensors `(x, y)`.
     model_transform : Callable
         Function that receives the output from the model and
         convert it into the form as required by the loss function.
@@ -83,6 +87,8 @@ def create_supervised_trainer(
         model.train()
 
         x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
+        x, y = input_transform(x, y)
+
         with torch.autocast(device_type=device.type, enabled=amp):
             output = model(x)
             y_pred = model_transform(output)
@@ -135,6 +141,7 @@ def create_supervised_evaluator(
     device: Union[str, torch.device] = "cpu",
     non_blocking: bool = False,
     prepare_batch: Callable = _prepare_batch,
+    input_transform: Callable[[Any, Any], Any] = lambda x, y: (x, y),
     model_transform: Callable[[Any], Any] = lambda output: output,
     output_transform: Callable[[Any, Any, Any], Any] = lambda x, y, y_pred: (
         y_pred,
@@ -163,6 +170,9 @@ def create_supervised_evaluator(
     prepare_batch : Callable
         Function that receives `batch`, `device`, `non_blocking`
         and outputs tuple of tensors `(batch_x, batch_y)`.
+    input_transform : Callable
+        Function that receives tensors `y` and `y` and outputs tuple of
+        tensors `(x, y)`.
     model_transform : Callable
         Function that receives the output from the model and convert it into
         the predictions: `y_pred = model_transform(model(x))`.
@@ -185,6 +195,7 @@ def create_supervised_evaluator(
             x, y = prepare_batch(
                 batch, device=device, non_blocking=non_blocking
             )
+            x, y = input_transform(x, y)
 
             with torch.autocast(device_type=device.type, enabled=config.amp):
                 output = model(x)

@@ -65,13 +65,13 @@ def create_image_logger(
     interpolation: InterpolationMode = InterpolationMode.NEAREST,
     antialias: bool = True,
     num_cols: Optional[int] = None,
-    normalize_mean: Sequence[float] = (0.0, 0.0, 0.0),
-    normalize_std: Sequence[float] = (1.0, 1.0, 1.0),
     denormalize_input: bool = False,
     denormalize_target: bool = False,
+    normalize_mean: Sequence[float] = (0.0, 0.0, 0.0),
+    normalize_std: Sequence[float] = (1.0, 1.0, 1.0),
     progress: bool = False,
     prepare_batch: Callable = _prepare_batch,
-    input_transform: Callable[[Any], Any] = lambda x: x,
+    input_transform: Callable[[Any, Any], Any] = lambda x, y: (x, y),
     model_transform: Callable[[Any], Any] = lambda output: output,
     output_transform: Callable[[Any, Any, Any], Any] = lambda x, y, y_pred: (
         x,
@@ -96,15 +96,31 @@ def create_image_logger(
         If `true` antialiasing is used when resizing images.
     num_cols : int
         Number of columns in image grid.
+        Defaults to number of elements in returned tuple.
+    denormalize_input : bool
+        If `true` input images (x) a denormalized after inference.
+    denormalize_target : bool
+        If `true` target images (y and y_pred) are denormalized after inference.
     normalize_mean : (float, float, float)
         RGB mean values used in image normalization.
     normalize_std : (float, float, float)
         RGB std.dev. values used in image normalization.
-    denormalize_input : bool
-        If `true` input images a denormalized before logging.
-    denormalize_target : bool
-        If `true` target images (y and y_pred) are denormalized before logging.
-    """
+    progress : bool
+        Show progress bar.
+    prepare_batch : Callable
+        Function that receives `batch`, `device`, `non_blocking` and
+        outputs tuple of tensors `(batch_x, batch_y)`.
+    input_transform : Callable
+        Function that receives tensors `y` and `y` and outputs tuple of
+        tensors `(x, y)`.
+    model_transform : Callable
+        Function that receives the output from the model during evaluation
+        and converts it into the predictions:
+        `y_pred = model_transform(model(x))`.
+    output_transform : Callable
+        Function that receives `x`, `y`, `y_pred` and returns tensors to be
+        logged as images. Default is returning `(x, y_pred, y)`.
+    """  # noqa: E501
     denormalize = Denormalize(
         torch.as_tensor(normalize_mean),
         torch.as_tensor(normalize_std),
@@ -132,7 +148,7 @@ def create_image_logger(
         images = []
         for batch in data_iter:
             x, y = prepare_batch(batch, device, non_blocking=False)
-            x = input_transform(x)
+            x, y = input_transform(x, y)
             with torch.inference_mode():
                 with torch.autocast(
                     device_type=device.type, enabled=config.amp

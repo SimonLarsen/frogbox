@@ -47,10 +47,18 @@ class SupervisedPipeline(Pipeline):
         tags: Optional[Sequence[str]] = None,
         group: Optional[str] = None,
         prepare_batch: Callable = _prepare_batch,
+        trainer_input_transform: Callable[[Any, Any], Any] = lambda x, y: (
+            x,
+            y,
+        ),
         trainer_model_transform: Callable[[Any], Any] = lambda output: output,
         trainer_output_transform: Callable[
             [Any, Any, Any, torch.Tensor], Any
         ] = lambda x, y, y_pred, loss: loss.item(),
+        evaluator_input_transform: Callable[[Any, Any], Any] = lambda x, y: (
+            x,
+            y,
+        ),
         evaluator_model_transform: Callable[
             [Any], Any
         ] = lambda output: output,
@@ -85,6 +93,9 @@ class SupervisedPipeline(Pipeline):
         prepare_batch : Callable
             Function that receives `batch`, `device`, `non_blocking` and
             outputs tuple of tensors `(batch_x, batch_y)`.
+        trainer_input_transform : Callable
+            Function that receives tensors `y` and `y` and outputs tuple of
+            tensors `(x, y)`.
         trainer_model_transform : Callable
             Function that receives the output from the model during training
             and converts it into the form as required by the loss function.
@@ -92,6 +103,9 @@ class SupervisedPipeline(Pipeline):
             Function that receives `x`, `y`, `y_pred`, `loss` and returns value
             to be assigned to trainer's `state.output` after each iteration.
             Default is returning `loss.item()`.
+        evaluator_input_transform : Callable
+            Function that receives tensors `y` and `y` and outputs tuple of
+            tensors `(x, y)`.
         evaluator_model_transform : Callable
             Function that receives the output from the model during evaluation
             and converts it into the predictions:
@@ -135,6 +149,7 @@ class SupervisedPipeline(Pipeline):
             loss_fn=self.loss_fn,
             device=device,
             prepare_batch=prepare_batch,
+            input_transform=trainer_input_transform,
             model_transform=trainer_model_transform,
             output_transform=trainer_output_transform,
         )
@@ -164,6 +179,7 @@ class SupervisedPipeline(Pipeline):
             metrics=metrics,
             device=device,
             prepare_batch=prepare_batch,
+            input_transform=evaluator_input_transform,
             model_transform=evaluator_model_transform,
             output_transform=evaluator_output_transform,
         )
