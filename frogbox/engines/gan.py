@@ -15,6 +15,8 @@ def create_gan_trainer(
     device: Union[str, torch.device] = "cpu",
     amp: bool = False,
     clip_grad_norm: Optional[float] = None,
+    update_interval: int = 1,
+    disc_update_interval: int = 1,
     non_blocking: bool = False,
     prepare_batch: Callable = _prepare_batch,
     input_transform: Callable[[Any, Any], Any] = lambda x, y: (x, y),
@@ -54,6 +56,10 @@ def create_gan_trainer(
         If `true` automatic mixed-precision is enabled.
     clip_grad_norm : float
         Clip gradients to norm if provided.
+    update_interval : int
+        How many steps between updating `model`.
+    disc_update_interval : int
+        How many steps between updating `disc_model`.
     non_blocking : bool
         If `True` and this copy is between CPU and GPU, the copy may
         occur asynchronously with respect to the host.
@@ -109,19 +115,25 @@ def create_gan_trainer(
         with torch.autocast(device_type=device.type, enabled=amp):
             y_pred = model_transform(model(x))
             disc_pred_real = disc_model_transform(disc_model(y))
-            disc_pred_fake = disc_model_transform(disc_model(y_pred.detach()))
+            disc_pred_fake = disc_model_transform(
+                disc_model(y_pred.detach())
+            )
             disc_loss = disc_loss_fn(
-                y_pred, y, disc_real=disc_pred_real, disc_fake=disc_pred_fake
+                y_pred,
+                y,
+                disc_real=disc_pred_real,
+                disc_fake=disc_pred_fake,
             )
 
-        _backward_with_scaler(
-            model=disc_model,
-            optimizer=disc_optimizer,
-            loss=disc_loss,
-            iteration=engine.state.iteration,
-            clip_grad_norm=clip_grad_norm,
-            scaler=disc_scaler,
-        )
+        if engine.state.iteration % disc_update_interval == 0:
+            _backward_with_scaler(
+                model=disc_model,
+                optimizer=disc_optimizer,
+                loss=disc_loss,
+                iteration=engine.state.iteration,
+                clip_grad_norm=clip_grad_norm,
+                scaler=disc_scaler,
+            )
 
         # Update generator
         optimizer.zero_grad()
@@ -129,17 +141,21 @@ def create_gan_trainer(
         with torch.autocast(device_type=device.type, enabled=amp):
             disc_pred_fake = disc_model_transform(disc_model(y_pred))
             loss = loss_fn(
-                y_pred, y, disc_real=disc_pred_real, disc_fake=disc_pred_fake
+                y_pred,
+                y,
+                disc_real=disc_pred_real,
+                disc_fake=disc_pred_fake,
             )
 
-        _backward_with_scaler(
-            model=model,
-            optimizer=optimizer,
-            loss=loss,
-            iteration=engine.state.iteration,
-            clip_grad_norm=clip_grad_norm,
-            scaler=scaler,
-        )
+        if engine.state.iteration % update_interval == 0:
+            _backward_with_scaler(
+                model=model,
+                optimizer=optimizer,
+                loss=loss,
+                iteration=engine.state.iteration,
+                clip_grad_norm=clip_grad_norm,
+                scaler=scaler,
+            )
 
         return output_transform(x, y, y_pred, loss, disc_loss)
 

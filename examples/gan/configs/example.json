@@ -9,6 +9,7 @@
     "checkpoint_metric": "PSNR",
     "log_interval": "epoch_completed",
     "datasets": {% include 'datasets.json' %},
+    "disc_update_interval": 2,
     "model": {
         "class_name": "models.upscaler.Upscaler",
         "params": {

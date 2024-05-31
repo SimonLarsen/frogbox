@@ -178,6 +178,8 @@ class GANPipeline(Pipeline):
             device=device,
             amp=config.amp,
             clip_grad_norm=config.clip_grad_norm,
+            update_interval=config.update_interval,
+            disc_update_interval=config.disc_update_interval,
             prepare_batch=prepare_batch,
             input_transform=trainer_input_transform,
             model_transform=trainer_model_transform,
