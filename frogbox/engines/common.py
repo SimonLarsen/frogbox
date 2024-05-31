@@ -9,7 +9,7 @@ def _backward_with_scaler(
     iteration: int,
     gradient_accumulation_steps: int = 1,
     clip_grad_norm: Optional[float] = None,
-    scaler: Optional[torch.amp.GradScaler] = None,
+    scaler: Optional[torch.cuda.amp.GradScaler] = None,
 ):
     if scaler:
         scaler.scale(loss).backward()
