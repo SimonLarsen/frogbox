@@ -1,4 +1,4 @@
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional, Union
 from math import ceil
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -22,8 +22,10 @@ def create_data_loaders(
     batch_size: int,
     loader_workers: int,
     datasets: Dict[str, ObjectDefinition],
-    loaders: Dict[str, ObjectDefinition] = dict(),
+    loaders: Optional[Dict[str, ObjectDefinition]] = None,
 ) -> Tuple[Dict[str, Dataset], Dict[str, DataLoader]]:
+    if loaders is None:
+        loaders = dict()
     out_datasets = {}
     out_loaders = {}
     for split in datasets.keys():
@@ -50,7 +52,7 @@ def create_data_loaders(
 
 def create_composite_loss(
     config: Dict[str, LossDefinition],
-    device: torch.device,
+    device: Union[str, torch.device],
 ) -> CompositeLoss:
     loss_labels = []
     loss_modules = []
@@ -64,7 +66,7 @@ def create_composite_loss(
         labels=loss_labels,
         losses=loss_modules,
         weights=loss_weights,
-    ).to(device)
+    ).to(torch.device(device))
     return loss_fn
 
 

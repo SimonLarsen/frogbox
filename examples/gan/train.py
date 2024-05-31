@@ -2,7 +2,8 @@ from typing import Optional, Sequence
 from pathlib import Path
 import argparse
 import torch
-from frogbox import read_json_config, SupervisedPipeline
+from frogbox import read_json_config, GANPipeline, Events
+from frogbox.callbacks import create_image_logger
 
 
 def parse_arguments(
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     config = read_json_config(args.config)
 
-    pipeline = SupervisedPipeline(
+    pipeline = GANPipeline(
         config=config,
         device=args.device,
         checkpoint=args.checkpoint,
@@ -42,6 +43,20 @@ if __name__ == "__main__":
         wandb_id=args.wandb_id,
         tags=args.tags,
         group=args.group,
+        evaluator_model_transform=lambda y_pred: y_pred.float(),
+    )
+
+    dataset_params = config.datasets["test"].params
+    image_logger = create_image_logger(
+        split="test",
+        normalize_mean=dataset_params["normalize_mean"],
+        normalize_std=dataset_params["normalize_std"],
+        denormalize_input=dataset_params["do_normalize"],
+        model_transform=lambda y_pred: y_pred.float(),
+    )
+    pipeline.install_callback(
+        event=Events.EPOCH_COMPLETED,
+        callback=image_logger,
     )
 
     pipeline.run()

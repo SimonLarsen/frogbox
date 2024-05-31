@@ -12,6 +12,7 @@ from ignite.engine import Events, CallableEventWithFilter
 
 class ConfigType(str, Enum):
     SUPERVISED = "supervised"
+    GAN = "gan"
 
 
 class CheckpointMode(str, Enum):
@@ -174,7 +175,7 @@ class SupervisedConfig(Config):
         Learning rate scheduler.
     """
 
-    amp: bool = True
+    amp: bool = False
     batch_size: int = 32
     loader_workers: int = 0
     max_epochs: int = 32
@@ -182,9 +183,9 @@ class SupervisedConfig(Config):
     gradient_accumulation_steps: int = 1
     datasets: Dict[str, ObjectDefinition]
     loaders: Dict[str, ObjectDefinition] = dict()
+    model: ObjectDefinition
     losses: Dict[str, LossDefinition] = dict()
     metrics: Dict[str, ObjectDefinition] = dict()
-    model: ObjectDefinition
     optimizer: ObjectDefinition = ObjectDefinition(
         class_name="torch.optim.AdamW"
     )
@@ -205,7 +206,17 @@ class SupervisedConfig(Config):
         return v
 
 
-def read_json_config(path: Union[str, PathLike]) -> SupervisedConfig:
+class GANConfig(SupervisedConfig):
+    disc_model: ObjectDefinition
+    gan_losses: Dict[str, LossDefinition] = dict()
+    disc_losses: Dict[str, LossDefinition] = dict()
+    disc_optimizer: ObjectDefinition = ObjectDefinition(
+        class_name="torch.optim.AdamW"
+    )
+    disc_lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
+
+
+def read_json_config(path: Union[str, PathLike]) -> Config:
     """
     Read and render JSON config file and render using jinja2.
 
@@ -221,6 +232,8 @@ def read_json_config(path: Union[str, PathLike]) -> SupervisedConfig:
     assert "type" in config
     if config["type"] == "supervised":
         return SupervisedConfig.model_validate(config)
+    elif config["type"] == "gan":
+        return GANConfig.model_validate(config)
     else:
         raise RuntimeError(f"Unknown config type {config['type']}.")
 

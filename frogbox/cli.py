@@ -27,7 +27,7 @@ def project():
     "--type",
     "-t",
     "type_",
-    type=click.Choice(["supervised"]),
+    type=click.Choice(["supervised", "gan"]),
     default="supervised",
     help="Pipeline type.",
 )
@@ -89,7 +89,6 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
         config = SupervisedConfig(
             type="supervised",
             project="example",
-            model=ObjectDefinition(class_name="models.example.ExampleModel"),
             datasets={
                 "train": ObjectDefinition(
                     class_name="datasets.example.ExampleDataset"
@@ -98,6 +97,27 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
                     class_name="datasets.example.ExampleDataset"
                 ),
             },
+            model=ObjectDefinition(class_name="models.example.ExampleModel"),
+        )
+        config_json = config.model_dump_json(indent=2, exclude_none=True)
+    elif type_ == "gan":
+        from .config import GANConfig, ObjectDefinition
+
+        config = GANConfig(
+            type="gan",
+            project="example",
+            datasets={
+                "train": ObjectDefinition(
+                    class_name="datasets.example.ExampleDataset"
+                ),
+                "val": ObjectDefinition(
+                    class_name="datasets.example.ExampleDataset"
+                ),
+            },
+            model=ObjectDefinition(class_name="models.example.ExampleModel"),
+            disc_model=ObjectDefinition(
+                class_name="models.example.ExampleModel"
+            ),
         )
         config_json = config.model_dump_json(indent=2, exclude_none=True)
     else:
@@ -310,7 +330,7 @@ def validate(path: Path):
     "--type",
     "-t",
     "type_",
-    type=click.Choice(["supervised"]),
+    type=click.Choice(["supervised", "gan"]),
     default="supervised",
     help="Pipeline type.",
 )
@@ -330,6 +350,10 @@ def schema(type_: str, out: Optional[Path] = None):
         from .config import SupervisedConfig
 
         schema = json.dumps(SupervisedConfig.model_json_schema(), indent=2)
+    elif type_ == "gan":
+        from .config import GANConfig
+
+        schema = json.dumps(GANConfig.model_json_schema(), indent=2)
     else:
         raise RuntimeError(f"Unknown pipeline type {type_}.")
 

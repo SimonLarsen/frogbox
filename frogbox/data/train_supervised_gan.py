@@ -2,7 +2,7 @@ from typing import Optional, Sequence
 from pathlib import Path
 import argparse
 import torch
-from frogbox import read_json_config, SupervisedPipeline
+from frogbox import read_json_config, GANPipeline
 
 
 def parse_arguments(
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     config = read_json_config(args.config)
 
-    pipeline = SupervisedPipeline(
+    pipeline = GANPipeline(
         config=config,
         device=args.device,
         checkpoint=args.checkpoint,

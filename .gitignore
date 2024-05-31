@@ -164,8 +164,17 @@ docs/*.html
 docs/*.js
 docs/frogbox/
 
-# Example data
-example/wandb/
-example/checkpoints/
-example/data/
+# Virtual environment symlink
 venv
+
+# Training data
+wandb/
+checkpoints/
+
+# Example projects
+examples/supervised/wandb/
+examples/supervised/checkpoints/
+examples/supervised/data/
+examples/gan/wandb/
+examples/gan/checkpoints/
+examples/gan/data/
