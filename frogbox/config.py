@@ -208,7 +208,6 @@ class SupervisedConfig(Config):
 
 class GANConfig(SupervisedConfig):
     disc_model: ObjectDefinition
-    gan_losses: Dict[str, LossDefinition] = dict()
     disc_losses: Dict[str, LossDefinition] = dict()
     disc_optimizer: ObjectDefinition = ObjectDefinition(
         class_name="torch.optim.AdamW"

@@ -41,6 +41,7 @@ image_logger = create_image_logger(
 )
 ```
 """  # noqa: E501
+
 from typing import Callable, Any, Sequence, Optional
 import torch
 from torchvision.transforms.functional import (

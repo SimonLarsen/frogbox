@@ -68,4 +68,4 @@ def load_model_checkpoint(
         model.load_state_dict(ckpt["model"])
         return model, config
     else:
-        raise RuntimeError(f"Unsupported config type {config.type}.")
+        raise RuntimeError(f"Unsupported config type {base_config.type}.")

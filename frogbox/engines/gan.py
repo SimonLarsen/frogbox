@@ -11,7 +11,6 @@ def create_gan_trainer(
     optimizer: torch.optim.Optimizer,
     disc_optimizer: torch.optim.Optimizer,
     loss_fn: Union[Callable, torch.nn.Module],
-    gan_loss_fn: Union[Callable, torch.nn.Module],
     disc_loss_fn: Union[Callable, torch.nn.Module],
     device: Union[str, torch.device] = "cpu",
     amp: bool = False,
@@ -22,10 +21,9 @@ def create_gan_trainer(
     model_transform: Callable[[Any], Any] = lambda output: output,
     disc_model_transform: Callable[[Any], Any] = lambda output: output,
     output_transform: Callable[
-        [Any, Any, Any, torch.Tensor, torch.Tensor, torch.Tensor], Any
-    ] = lambda x, y, y_pred, loss, gan_loss, disc_loss: (
+        [Any, Any, Any, torch.Tensor, torch.Tensor], Any
+    ] = lambda x, y, y_pred, loss, disc_loss: (
         loss.item(),
-        gan_loss.item(),
         disc_loss.item(),
     ),
     deterministic: bool = False,
@@ -46,8 +44,6 @@ def create_gan_trainer(
         The optimizer to use for discriminator.
     loss_fn : torch.nn.Module
         The supervised loss function to use for model.
-    gan_loss_fn : torch.nn.Module
-        The GAN loss function to use for model.
     disc_loss_fn : torch.nn.Module
         The loss function to use discriminator.
     device : torch.device
@@ -77,7 +73,7 @@ def create_gan_trainer(
     output_transform : Callable
         Function that receives `x`, `y`, `y_pred`, `loss` and returns value
         to be assigned to engine's state.output after each iteration. Default
-        is returning `(loss.item(), gan_loss.item(), disc_loss.item())`.
+        is returning `(loss.item(), disc_loss.item())`.
     deterministic : bool
         If `True`, returns `DeterministicEngine`, otherwise `Engine`.
     terminate_on_nan: bool
@@ -114,7 +110,9 @@ def create_gan_trainer(
             y_pred = model_transform(model(x))
             disc_pred_real = disc_model_transform(disc_model(y))
             disc_pred_fake = disc_model_transform(disc_model(y_pred.detach()))
-            disc_loss = disc_loss_fn(disc_pred_real, disc_pred_fake)
+            disc_loss = disc_loss_fn(
+                y_pred, y, disc_real=disc_pred_real, disc_fake=disc_pred_fake
+            )
 
         _backward_with_scaler(
             model=disc_model,
@@ -130,21 +128,20 @@ def create_gan_trainer(
 
         with torch.autocast(device_type=device.type, enabled=amp):
             disc_pred_fake = disc_model_transform(disc_model(y_pred))
-            gan_loss = gan_loss_fn(
-                disc_pred_fake, torch.ones_like(disc_pred_fake)
+            loss = loss_fn(
+                y_pred, y, disc_real=disc_pred_real, disc_fake=disc_pred_fake
             )
-            loss = loss_fn(y_pred, y)
 
         _backward_with_scaler(
             model=model,
             optimizer=optimizer,
-            loss=loss + gan_loss,
+            loss=loss,
             iteration=engine.state.iteration,
             clip_grad_norm=clip_grad_norm,
             scaler=scaler,
         )
 
-        return output_transform(x, y, y_pred, loss, gan_loss, disc_loss)
+        return output_transform(x, y, y_pred, loss, disc_loss)
 
     trainer = (
         Engine(_update) if not deterministic else DeterministicEngine(_update)

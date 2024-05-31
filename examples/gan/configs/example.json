@@ -33,12 +33,10 @@
         "L1": {
             "weight": 1.0,
             "class_name": "torch.nn.L1Loss"
-        }
-    },
-    "gan_losses": {
-        "BCE": {
+        },
+        "GAN-BCE": {
             "weight": 1.0,
-            "class_name": "torch.nn.BCEWithLogitsLoss"
+            "class_name": "losses.gan.GANBCELoss"
         }
     },
     "disc_losses": {

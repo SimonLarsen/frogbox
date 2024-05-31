@@ -37,7 +37,6 @@ class GANPipeline(Pipeline):
     lr_scheduler: ParamScheduler
     disc_lr_scheduler: ParamScheduler
     loss_fn: CompositeLoss
-    gan_loss_fn: CompositeLoss
     disc_loss_fn: CompositeLoss
 
     def __init__(
@@ -61,10 +60,9 @@ class GANPipeline(Pipeline):
             [Any], Any
         ] = lambda output: output,
         trainer_output_transform: Callable[
-            [Any, Any, Any, torch.Tensor, torch.Tensor, torch.Tensor], Any
-        ] = lambda x, y, y_pred, loss, gan_loss, disc_loss: (
+            [Any, Any, Any, torch.Tensor, torch.Tensor], Any
+        ] = lambda x, y, y_pred, loss, disc_loss: (
             loss.item(),
-            gan_loss.item(),
             disc_loss.item(),
         ),
         evaluator_input_transform: Callable[[Any, Any], Any] = lambda x, y: (
@@ -169,7 +167,6 @@ class GANPipeline(Pipeline):
 
         # Create trainer
         self.loss_fn = create_composite_loss(config.losses, device)
-        self.gan_loss_fn = create_composite_loss(config.gan_losses, device)
         self.disc_loss_fn = create_composite_loss(config.disc_losses, device)
         self.trainer = create_gan_trainer(
             model=self.model,
@@ -177,7 +174,6 @@ class GANPipeline(Pipeline):
             optimizer=self.optimizer,
             disc_optimizer=self.disc_optimizer,
             loss_fn=self.loss_fn,
-            gan_loss_fn=self.gan_loss_fn,
             disc_loss_fn=self.disc_loss_fn,
             device=device,
             amp=config.amp,
@@ -243,8 +239,7 @@ class GANPipeline(Pipeline):
             tag="train",
             output_transform=lambda losses: {
                 "loss": losses[0],
-                "gan_loss": losses[1],
-                "disc_loss": losses[2],
+                "disc_loss": losses[1],
             },
         )
         self.logger.attach_opt_params_handler(
@@ -273,8 +268,8 @@ class GANPipeline(Pipeline):
 
         @self.trainer.on(Events.ITERATION_COMPLETED)
         def log_losses(trainer):
-            fns = (self.loss_fn, self.gan_loss_fn, self.disc_loss_fn)
-            prefixes = ("loss", "gan_loss", "disc_loss")
+            fns = (self.loss_fn, self.disc_loss_fn)
+            prefixes = ("loss", "disc_loss")
             for prefix, fn in zip(prefixes, fns):
                 labels = [f"{prefix}/{label}" for label in fn.labels]
                 losses = dict(zip(labels, fn.last_values))
