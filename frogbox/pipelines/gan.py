@@ -1,3 +1,65 @@
+"""
+# Training a GAN
+
+The GAN pipeline is similar to the supervised pipelines, except that it adds
+another model, the discriminator, with its own loss function(s).
+
+The discriminator model is configured in the `disc_model ` similarly to the
+(generator model):
+
+```json
+{
+    "type": "gan",
+    "model": {
+        "class_name": "models.generator.MyGenerator",
+        "params": { ... }
+    },
+    "disc_model": {
+        "class_name": "models.disciminator.MyDiscriminator",
+        "params": { ... }
+    },
+    ...
+}
+```
+
+## Loss functions
+
+The `GANPipeline` request two different loss functions: `losses` defines the
+loss function for the generator and `disc_losses` defines the loss function for
+the disciminator.
+
+The losses take two optional arguments: `disc_real` and `disc_pred`.
+These tensors contain the predictions from the discriminator model
+when passed the batch of real and fake data, respectively.
+
+They are computed (roughly) like this:
+
+```python
+x, y = fetch_data(dataset)
+y_pred = model(x)
+disc_real = disc_model(y)
+disc_fake = disc_model(y_pred)
+```
+
+Note: These arguments are optional keyword arguments and thus their names must
+match exactly.
+
+## Updating models at different intervals
+
+It is possible to update the generator and disciminator models at different
+intervals using t he `update_interval` and `disc_update_interval` fields.
+For instance, in order to the discriminator only every five iterations:
+
+```json
+{
+    "type": "gan",
+    "update_interval": 1,
+    "disc_update_interval": 5,
+    ...
+}
+```
+"""
+
 from typing import Any, Dict, Callable, Union, Optional, Sequence
 from os import PathLike
 from pathlib import Path
