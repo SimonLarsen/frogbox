@@ -34,9 +34,7 @@ from .config import (
 )
 
 
-def load_model_checkpoint(
-    path: Union[str, PathLike]
-) -> Tuple[Any, Config]:
+def load_model_checkpoint(path: Union[str, PathLike]) -> Tuple[Any, Config]:
     """
     Load model from checkpoint.
 

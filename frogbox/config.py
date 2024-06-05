@@ -10,6 +10,25 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from ignite.engine import Events, CallableEventWithFilter
 
 
+class ConfigParseError(ValueError):
+    def __init__(self, msg, doc, lineno, colno):
+        errline = doc.split("\n")[lineno - 1]
+        errmarker = " " * (colno - 1) + "^"
+        errmsg = f"""{msg}: line {lineno} column {colno}
+        ```
+        {errline}
+        {errmarker}
+        ```"""
+        super().__init__(errmsg)
+        self.doc = doc
+        self.msg = msg
+        self.lineno = lineno
+        self.colno = colno
+
+    def __reduce__(self):
+        return self.__class__, (self.msg, self.doc, self.lineno, self.colno)
+
+
 class ConfigType(str, Enum):
     SUPERVISED = "supervised"
     GAN = "gan"
@@ -229,7 +248,11 @@ def read_json_config(path: Union[str, PathLike]) -> Config:
     path = Path(path)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(path.parent)))
     template = env.get_template(str(path.relative_to(path.parent)))
-    config = json.loads(template.render())
+    try:
+        config = json.loads(template.render())
+    except json.JSONDecodeError as e:
+        raise ConfigParseError(e.msg, e.doc, e.lineno, e.colno) from e
+
     assert "type" in config
     if config["type"] == "supervised":
         return SupervisedConfig.model_validate(config)

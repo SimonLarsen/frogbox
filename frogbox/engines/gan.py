@@ -115,9 +115,7 @@ def create_gan_trainer(
         with torch.autocast(device_type=device.type, enabled=amp):
             y_pred = model_transform(model(x))
             disc_pred_real = disc_model_transform(disc_model(y))
-            disc_pred_fake = disc_model_transform(
-                disc_model(y_pred.detach())
-            )
+            disc_pred_fake = disc_model_transform(disc_model(y_pred.detach()))
             disc_loss = disc_loss_fn(
                 y_pred,
                 y,
