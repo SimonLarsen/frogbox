@@ -6,12 +6,13 @@ from pathlib import Path
 from importlib import import_module
 import json
 import jinja2
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from ignite.engine import Events, CallableEventWithFilter
 
 
 class ConfigType(str, Enum):
     SUPERVISED = "supervised"
+    GAN = "gan"
 
 
 class CheckpointMode(str, Enum):
@@ -102,10 +103,10 @@ class LRSchedulerDefinition(BaseModel):
     type: SchedulerType = SchedulerType.COSINE
     start_value: float = 3e-4
     end_value: float = 1e-7
-    cycles: int = 1
-    start_value_mult: float = 1.0
-    end_value_mult: float = 1.0
-    warmup_steps: int = 0
+    cycles: int = Field(1, ge=1)
+    start_value_mult: float = Field(1.0, gt=0.0)
+    end_value_mult: float = Field(1.0, gt=0.0)
+    warmup_steps: int = Field(0, ge=0)
 
 
 class Config(BaseModel):
@@ -135,7 +136,7 @@ class Config(BaseModel):
     project: str
     checkpoint_metric: Optional[str] = None
     checkpoint_mode: CheckpointMode = CheckpointMode.MAX
-    checkpoint_n_saved: int = 3
+    checkpoint_n_saved: int = Field(3, ge=1)
     log_interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
 
 
@@ -174,17 +175,17 @@ class SupervisedConfig(Config):
         Learning rate scheduler.
     """
 
-    amp: bool = True
-    batch_size: int = 32
-    loader_workers: int = 0
-    max_epochs: int = 32
+    amp: bool = False
+    batch_size: int = Field(32, ge=1)
+    loader_workers: int = Field(0, ge=0)
+    max_epochs: int = Field(32, ge=1)
     clip_grad_norm: Optional[float] = None
-    gradient_accumulation_steps: int = 1
+    gradient_accumulation_steps: int = Field(1, ge=1)
     datasets: Dict[str, ObjectDefinition]
     loaders: Dict[str, ObjectDefinition] = dict()
+    model: ObjectDefinition
     losses: Dict[str, LossDefinition] = dict()
     metrics: Dict[str, ObjectDefinition] = dict()
-    model: ObjectDefinition
     optimizer: ObjectDefinition = ObjectDefinition(
         class_name="torch.optim.AdamW"
     )
@@ -205,7 +206,18 @@ class SupervisedConfig(Config):
         return v
 
 
-def read_json_config(path: Union[str, PathLike]) -> SupervisedConfig:
+class GANConfig(SupervisedConfig):
+    disc_model: ObjectDefinition
+    disc_losses: Dict[str, LossDefinition] = dict()
+    disc_optimizer: ObjectDefinition = ObjectDefinition(
+        class_name="torch.optim.AdamW"
+    )
+    disc_lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
+    update_interval: int = Field(1, ge=1)
+    disc_update_interval: int = Field(1, ge=1)
+
+
+def read_json_config(path: Union[str, PathLike]) -> Config:
     """
     Read and render JSON config file and render using jinja2.
 
@@ -221,6 +233,8 @@ def read_json_config(path: Union[str, PathLike]) -> SupervisedConfig:
     assert "type" in config
     if config["type"] == "supervised":
         return SupervisedConfig.model_validate(config)
+    elif config["type"] == "gan":
+        return GANConfig.model_validate(config)
     else:
         raise RuntimeError(f"Unknown config type {config['type']}.")
 

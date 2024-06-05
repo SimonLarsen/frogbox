@@ -19,8 +19,7 @@ class Pipeline(ABC):
     run_name: str
 
     @abstractmethod
-    def run(self) -> None:
-        ...
+    def run(self) -> None: ...
 
     def _setup_logger(
         self,
@@ -64,9 +63,11 @@ class Pipeline(ABC):
         if self.config.checkpoint_metric:
             score_function = Checkpoint.get_default_score_fn(
                 metric_name=self.config.checkpoint_metric,
-                score_sign=1.0
-                if self.config.checkpoint_mode == CheckpointMode.MAX
-                else -1.0,
+                score_sign=(
+                    1.0
+                    if self.config.checkpoint_mode == CheckpointMode.MAX
+                    else -1.0
+                ),
             )
 
         save_handler = DiskSaver(

@@ -13,7 +13,7 @@ Then train the model by running `train.py`:
 frogbox train.py -c configs/config.json -d cuda:0
 ```
 
-See example project in `example/train.py`.
+See example projects in `examples`.
 
 # Guides
 

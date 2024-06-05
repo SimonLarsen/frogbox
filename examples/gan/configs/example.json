@@ -1,0 +1,78 @@
+{
+    "type": "gan",
+    "project": "frogbox-example",
+    "amp": true,
+    "batch_size": 32,
+    "loader_workers": 4,
+    "max_epochs": 16,
+    "checkpoint_mode": "max",
+    "checkpoint_metric": "PSNR",
+    "log_interval": "epoch_completed",
+    "datasets": {% include 'datasets.json' %},
+    "disc_update_interval": 2,
+    "model": {
+        "class_name": "models.upscaler.Upscaler",
+        "params": {
+            "scale_factor": 2,
+            "in_channels": 3,
+            "out_channels": 3,
+            "hidden_channels": 32,
+            "num_layers": 4,
+            "norm_groups": 4
+        }
+    },
+    "disc_model": {
+        "class_name": "models.discriminator.Discriminator",
+        "params": {
+            "in_channels": 3,
+            "hidden_channels": 32,
+            "num_blocks": 8,
+            "activation": "silu"
+        }
+    },
+    "losses": {
+        "L1": {
+            "weight": 1.0,
+            "class_name": "torch.nn.L1Loss"
+        },
+        "GAN-BCE": {
+            "weight": 1.0,
+            "class_name": "losses.gan.GANBCELoss"
+        }
+    },
+    "disc_losses": {
+        "BCE": {
+            "weight": 1.0,
+            "class_name": "losses.disc.DiscriminatorLoss"
+        }
+    },
+    "metrics": {
+        "SSIM": {
+            "class_name": "ignite.metrics.SSIM",
+            "params": {"data_range": 1.0}
+        },
+        "PSNR": {
+            "class_name": "ignite.metrics.PSNR",
+            "params": {"data_range": 1.0}
+        }
+    },
+    "loaders": {
+        "train": {
+            "class_name": "torch.utils.data.DataLoader",
+            "params": {
+                "shuffle": true,
+                "drop_last": true
+            }
+        }
+    },
+    "lr_scheduler": {
+        "type": "cosine",
+        "start_value": 3e-4,
+        "end_value": 1e-7
+    },
+    "disc_lr_scheduler": {
+        "type": "cosine",
+        "start_value": 3e-4,
+        "end_value": 1e-7
+    }
+}

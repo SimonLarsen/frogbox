@@ -18,4 +18,5 @@ pipeline.install_callback(
 )
 ```
 """  # noqa: E501
+
 from .image_logger import create_image_logger  # noqa: F401
