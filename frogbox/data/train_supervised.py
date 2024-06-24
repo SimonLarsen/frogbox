@@ -1,8 +1,8 @@
-from typing import Optional, Sequence
+from typing import cast, Optional, Sequence
 from pathlib import Path
 import argparse
 import torch
-from frogbox import read_json_config, SupervisedPipeline
+from frogbox import read_json_config, SupervisedPipeline, SupervisedConfig
 
 
 def parse_arguments(
@@ -31,7 +31,7 @@ def parse_arguments(
 
 if __name__ == "__main__":
     args = parse_arguments()
-    config = read_json_config(args.config)
+    config = cast(SupervisedConfig, read_json_config(args.config))
 
     pipeline = SupervisedPipeline(
         config=config,
