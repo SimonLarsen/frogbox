@@ -12,7 +12,7 @@ Experiments are defined using JSON files and supports [jinja2](https://jinja.pal
 ## Installation
 
 ```sh
-pip install git+https://SimonLarsen@github.com/SimonLarsen/frogbox.git
+pip install git+https://SimonLarsen@github.com/SimonLarsen/frogbox.git@v0.3.2
 ```
 
 ## Getting started
