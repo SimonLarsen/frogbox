@@ -1,7 +1,6 @@
 from typing import Any, Dict, Optional, Union, Sequence, Callable
 from os import PathLike
 from pathlib import Path
-from math import ceil
 import torch
 from torch.utils.data import Dataset, DataLoader
 from ignite.engine import Engine, Events, _prepare_batch
@@ -159,11 +158,7 @@ class SupervisedPipeline(Pipeline):
         ProgressBar(desc="Train", ncols=80).attach(self.trainer)
 
         # Create learning rate scheduler
-        max_iterations = ceil(
-            len(self.datasets["train"])  # type: ignore[arg-type]
-            / config.batch_size
-            * config.max_epochs
-        )
+        max_iterations = len(self.loaders["train"]) * config.max_epochs
         self.lr_scheduler = create_lr_scheduler(
             optimizer=self.optimizer,
             config=config.lr_scheduler,

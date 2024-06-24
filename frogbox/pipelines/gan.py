@@ -63,7 +63,6 @@ For instance, in order to the discriminator only every five iterations:
 from typing import Any, Dict, Callable, Union, Optional, Sequence
 from os import PathLike
 from pathlib import Path
-from math import ceil
 import torch
 from torch.utils.data import Dataset, DataLoader
 from ignite.engine import Engine, Events, _prepare_batch
@@ -251,11 +250,7 @@ class GANPipeline(Pipeline):
         ProgressBar(desc="Train", ncols=80).attach(self.trainer)
 
         # Create learning rate schedulers
-        max_iterations = ceil(
-            len(self.datasets["train"])  # type: ignore[arg-type]
-            / config.batch_size
-            * config.max_epochs
-        )
+        max_iterations = len(self.loaders["train"]) * config.max_epochs
         self.lr_scheduler = create_lr_scheduler(
             optimizer=self.optimizer,
             config=config.lr_scheduler,
