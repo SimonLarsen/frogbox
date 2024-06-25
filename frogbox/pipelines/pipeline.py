@@ -11,6 +11,7 @@ from ..config import Config, CheckpointMode, parse_log_interval
 
 
 class Pipeline(ABC):
+    """Pipeline abstract base class."""
     config: Config
     trainer: Engine
     device: torch.device

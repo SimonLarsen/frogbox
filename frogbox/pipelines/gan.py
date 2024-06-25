@@ -5,7 +5,7 @@ The GAN pipeline is similar to the supervised pipelines, except that it adds
 another model, the discriminator, with its own loss function(s).
 
 The discriminator model is configured in the `disc_model ` similarly to the
-(generator model):
+(generator) model:
 
 ```json
 {
@@ -24,11 +24,11 @@ The discriminator model is configured in the `disc_model ` similarly to the
 
 ## Loss functions
 
-The `GANPipeline` request two different loss functions: `losses` defines the
+The `GANPipeline` requires two different loss functions: `losses` defines the
 loss function for the generator and `disc_losses` defines the loss function for
 the disciminator.
 
-The losses take two optional arguments: `disc_real` and `disc_pred`.
+Both losses take two optional arguments: `disc_real` and `disc_pred`.
 These tensors contain the predictions from the discriminator model
 when passed the batch of real and fake data, respectively.
 
@@ -42,13 +42,25 @@ disc_fake = disc_model(y_pred)
 ```
 
 Note: These arguments are optional keyword arguments and thus their names must
-match exactly.
+match exactly. Example:
+
+```python
+class DiscriminatorLoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.loss_fn = torch.nn.BCEWithLogitsLoss()
+
+    def forward(self, input, target, disc_real, disc_fake):
+        loss_real = self.loss_fn(disc_real, torch.ones_like(disc_real))
+        loss_fake = self.loss_fn(disc_fake, torch.zeros_like(disc_fake))
+        return loss_real + loss_fake
+```
 
 ## Updating models at different intervals
 
 It is possible to update the generator and disciminator models at different
-intervals using t he `update_interval` and `disc_update_interval` fields.
-For instance, in order to the discriminator only every five iterations:
+intervals using the `update_interval` and `disc_update_interval` fields.
+For instance, in order to update the discriminator only every five iterations:
 
 ```json
 {
@@ -86,6 +98,7 @@ from .composite_loss import CompositeLoss
 
 
 class GANPipeline(Pipeline):
+    """GAN pipeline."""
     config: GANConfig
     evaluator: Engine
     device: torch.device

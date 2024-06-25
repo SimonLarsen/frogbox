@@ -26,6 +26,7 @@ from .composite_loss import CompositeLoss
 
 
 class SupervisedPipeline(Pipeline):
+    """Supervised pipeline."""
     config: SupervisedConfig
     evaluator: Engine
     datasets: Dict[str, Dataset]
