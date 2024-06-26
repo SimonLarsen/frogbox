@@ -110,22 +110,21 @@ def create_gan_trainer(
         x, y = input_transform(x, y)
 
         # Update discriminator
-        disc_optimizer.zero_grad()
+        disc_loss = torch.tensor(0.0)
+        if (engine.state.iteration - 1) % disc_update_interval == 0:
+            disc_optimizer.zero_grad()
 
-        with torch.autocast(device_type=device.type, enabled=amp):
-            y_pred = model_transform(model(x))
-            disc_pred_real = disc_model_transform(disc_model(y))
-            disc_pred_fake = disc_model_transform(
-                disc_model(y_pred.detach())
-            )
-            disc_loss = disc_loss_fn(
-                y_pred,
-                y,
-                disc_real=disc_pred_real,
-                disc_fake=disc_pred_fake,
-            )
+            with torch.autocast(device_type=device.type, enabled=amp):
+                y_pred = model_transform(model(x)).detach()
+                disc_pred_real = disc_model_transform(disc_model(y))
+                disc_pred_fake = disc_model_transform(disc_model(y_pred))
+                disc_loss = disc_loss_fn(
+                    y_pred,
+                    y,
+                    disc_real=disc_pred_real,
+                    disc_fake=disc_pred_fake,
+                )
 
-        if engine.state.iteration % disc_update_interval == 0:
             _backward_with_scaler(
                 model=disc_model,
                 optimizer=disc_optimizer,
@@ -136,18 +135,19 @@ def create_gan_trainer(
             )
 
         # Update generator
-        optimizer.zero_grad()
+        loss = torch.tensor(0.0)
+        if (engine.state.iteration - 1) % update_interval == 0:
+            optimizer.zero_grad()
 
-        with torch.autocast(device_type=device.type, enabled=amp):
-            disc_pred_fake = disc_model_transform(disc_model(y_pred))
-            loss = loss_fn(
-                y_pred,
-                y,
-                disc_real=disc_pred_real,
-                disc_fake=disc_pred_fake,
-            )
+            with torch.autocast(device_type=device.type, enabled=amp):
+                y_pred = model_transform(model(x))
+                disc_pred_fake = disc_model_transform(disc_model(y_pred))
+                loss = loss_fn(
+                    y_pred,
+                    y,
+                    disc_fake=disc_pred_fake,
+                )
 
-        if engine.state.iteration % update_interval == 0:
             _backward_with_scaler(
                 model=model,
                 optimizer=optimizer,

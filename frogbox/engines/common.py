@@ -13,7 +13,7 @@ def _backward_with_scaler(
 ):
     if scaler:
         scaler.scale(loss).backward()
-        if iteration & gradient_accumulation_steps == 0:
+        if iteration % gradient_accumulation_steps == 0:
             scaler.unscale_(optimizer)
             if clip_grad_norm:
                 torch.nn.utils.clip_grad_norm_(
