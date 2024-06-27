@@ -5,8 +5,8 @@ from torchvision.transforms.functional import pil_to_tensor, resize
 from typing import Tuple, Sequence
 
 
-NORMALIZE_MEAN = [0.5, 0.5, 0.5]
-NORMALIZE_STD = [0.5, 0.5, 0.5]
+NORMALIZE_MEAN = (0.5, 0.5, 0.5)
+NORMALIZE_STD = (0.5, 0.5, 0.5)
 
 
 class ExampleDataset(Dataset):
@@ -29,10 +29,8 @@ class ExampleDataset(Dataset):
 
         if split == "val":
             self.data.data = self.data.data[:-32]
-            self.data.targets = self.data.targets[:-32]
         elif split == "test":
             self.data.data = self.data.data[-32:]
-            self.data.targets = self.data.targets[-32:]
 
         self.do_normalize = do_normalize
         self.do_augment = do_augment
