@@ -29,7 +29,7 @@ loss function for the generator and `disc_losses` defines the loss function for
 the disciminator.
 
 The discriminator loss takes two optional arguments, `disc_real` and `disc_fake`,
-and the generator loss takes on optional argument, `disc_fake`.
+and the generator loss takes one optional argument, `disc_fake`.
 These tensors contain the predictions from the discriminator model
 when passed the batch of real and fake data, respectively.
 
