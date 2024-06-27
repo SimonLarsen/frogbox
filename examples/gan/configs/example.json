@@ -65,6 +65,18 @@
             }
         }
     },
+    "optimizer": {
+        "class_name": "torch.optim.AdamW",
+        "params": {
+            "betas": [0.5, 0.999]
+        }
+    },
+    "disc_optimizer": {
+        "class_name": "torch.optim.AdamW",
+        "params": {
+            "betas": [0.5, 0.999]
+        }
+    },
     "lr_scheduler": {
         "type": "cosine",
         "start_value": 3e-4,
