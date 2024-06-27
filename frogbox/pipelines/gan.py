@@ -28,8 +28,8 @@ The `GANPipeline` requires two different loss functions: `losses` defines the
 loss function for the generator and `disc_losses` defines the loss function for
 the disciminator.
 
-The discriminator loss takes two optional arguments, `disc_real` and `disc_fake`,
-and the generator loss takes one optional argument, `disc_fake`.
+The discriminator loss takes two optional arguments, `disc_real` and
+`disc_fake`, and the generator loss takes one optional argument, `disc_fake`.
 These tensors contain the predictions from the discriminator model
 when passed the batch of real and fake data, respectively.
 
@@ -81,7 +81,6 @@ from torch.utils.data import Dataset, DataLoader
 from ignite.engine import Engine, Events, _prepare_batch
 from ignite.handlers import ParamScheduler, global_step_from_engine
 from ignite.contrib.handlers import ProgressBar
-import wandb
 from .pipeline import Pipeline
 from .common import (
     create_data_loaders,
@@ -346,7 +345,7 @@ class GANPipeline(Pipeline):
             for prefix, fn in zip(prefixes, fns):
                 labels = [f"{prefix}/{label}" for label in fn.labels]
                 losses = dict(zip(labels, fn.last_values))
-                wandb.log(step=trainer.state.iteration, data=losses)
+                self.log(losses)
 
         # Set up checkpoints
         to_save = {

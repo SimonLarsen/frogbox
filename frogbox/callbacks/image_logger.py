@@ -132,7 +132,6 @@ def create_image_logger(
         config = pipeline.config
         device = pipeline.device
         loaders = pipeline.loaders
-        trainer = pipeline.trainer
 
         model.eval()
 
@@ -183,7 +182,7 @@ def create_image_logger(
                     images.append(grid)
 
         wandb_images = [wandb.Image(to_pil_image(image)) for image in images]
-        wandb.log(step=trainer.state.iteration, data={log_label: wandb_images})
+        pipeline.log({log_label: wandb_images})
 
     return _callback
 

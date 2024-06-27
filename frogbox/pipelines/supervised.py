@@ -6,7 +6,6 @@ from torch.utils.data import Dataset, DataLoader
 from ignite.engine import Engine, Events, _prepare_batch
 from ignite.handlers import ParamScheduler, global_step_from_engine
 from ignite.contrib.handlers import ProgressBar
-import wandb
 from .pipeline import Pipeline
 from .common import (
     create_data_loaders,
@@ -219,7 +218,7 @@ class SupervisedPipeline(Pipeline):
         def log_losses(trainer):
             labels = [f"loss/{label}" for label in self.loss_fn.labels]
             losses = dict(zip(labels, self.loss_fn.last_values))
-            wandb.log(step=trainer.state.iteration, data=losses)
+            self.log(losses)
 
         # Set up checkpoints
         to_save = {

@@ -116,8 +116,13 @@ class Pipeline(ABC):
         event: Union[Events, CallableEventWithFilter],
         callback: Callable[["Pipeline"], None],
     ) -> None:
+        """Install callback in pipeline."""
         self.trainer.add_event_handler(
             event_name=event,
             handler=callback,
             pipeline=self,
         )
+
+    def log(self, data: Dict[str, Any]) -> None:
+        """Log data to Weights & Biases."""
+        self.logger.log(step=self.trainer.state.iteration, data=data)
