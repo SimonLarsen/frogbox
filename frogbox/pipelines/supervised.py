@@ -94,7 +94,7 @@ class SupervisedPipeline(Pipeline):
             Function that receives `batch`, `device`, `non_blocking` and
             outputs tuple of tensors `(batch_x, batch_y)`.
         trainer_input_transform : Callable
-            Function that receives tensors `y` and `y` and outputs tuple of
+            Function that receives tensors `x` and `y` and outputs tuple of
             tensors `(x, y)`.
         trainer_model_transform : Callable
             Function that receives the output from the model during training
@@ -104,7 +104,7 @@ class SupervisedPipeline(Pipeline):
             to be assigned to trainer's `state.output` after each iteration.
             Default is returning `loss.item()`.
         evaluator_input_transform : Callable
-            Function that receives tensors `y` and `y` and outputs tuple of
+            Function that receives tensors `x` and `y` and outputs tuple of
             tensors `(x, y)`.
         evaluator_model_transform : Callable
             Function that receives the output from the model during evaluation
