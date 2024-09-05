@@ -54,17 +54,16 @@ def load_model_checkpoint(
 
     config_path = path.parent / "config.json"
     base_config = read_json_config(config_path)
+    ckpt = torch.load(path, map_location="cpu", weights_only=True)
 
     if base_config.type == "supervised":
         config = cast(SupervisedConfig, base_config)
         model = create_object_from_config(config.model)
-        ckpt = torch.load(path, map_location="cpu")
         model.load_state_dict(ckpt["model"])
         return model, config
     elif base_config.type == "gan":
         config = cast(GANConfig, base_config)
         model = create_object_from_config(config.model)
-        ckpt = torch.load(path, map_location="cpu")
         model.load_state_dict(ckpt["model"])
         return model, config
     else:

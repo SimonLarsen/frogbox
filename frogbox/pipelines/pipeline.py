@@ -12,6 +12,7 @@ from ..config import Config, CheckpointMode, parse_log_interval
 
 class Pipeline(ABC):
     """Pipeline abstract base class."""
+
     config: Config
     trainer: Engine
     device: torch.device
@@ -108,7 +109,10 @@ class Pipeline(ABC):
         to_load = {k: to_save[k] for k in keys}
 
         Checkpoint.load_objects(
-            to_load=to_load, checkpoint=torch.load(str(path), "cpu")
+            to_load=to_load,
+            checkpoint=torch.load(
+                str(path), map_location="cpu", weights_only=True
+            ),
         )
 
     def install_callback(
