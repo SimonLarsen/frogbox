@@ -1,53 +1,12 @@
-from typing import Tuple, Dict, Optional, Union
-from math import ceil
+from typing import Dict, Union
 import torch
-from torch.utils.data import Dataset, DataLoader
-from ignite.handlers import (
-    ParamScheduler,
-    CosineAnnealingScheduler,
-    LinearCyclicalScheduler,
-    create_lr_scheduler_with_warmup,
-)
 from ..config import (
-    ObjectDefinition,
     LossDefinition,
     SchedulerType,
     LRSchedulerDefinition,
     create_object_from_config,
 )
 from .composite_loss import CompositeLoss
-
-
-def create_data_loaders(
-    batch_size: int,
-    loader_workers: int,
-    datasets: Dict[str, ObjectDefinition],
-    loaders: Optional[Dict[str, ObjectDefinition]] = None,
-) -> Tuple[Dict[str, Dataset], Dict[str, DataLoader]]:
-    if loaders is None:
-        loaders = dict()
-    out_datasets = {}
-    out_loaders = {}
-    for split in datasets.keys():
-        ds = create_object_from_config(datasets[split])
-        out_datasets[split] = ds
-
-        if split in loaders:
-            out_loaders[split] = create_object_from_config(
-                loaders[split],
-                dataset=ds,
-                batch_size=batch_size,
-                num_workers=loader_workers,
-            )
-        else:
-            out_loaders[split] = DataLoader(
-                dataset=ds,
-                batch_size=batch_size,
-                num_workers=loader_workers,
-                shuffle=split == "train",
-            )
-
-    return out_datasets, out_loaders
 
 
 def create_composite_loss(
@@ -74,42 +33,40 @@ def create_lr_scheduler(
     optimizer: torch.optim.Optimizer,
     config: LRSchedulerDefinition,
     max_iterations: int,
-) -> ParamScheduler:
+) -> torch.optim.lr_scheduler.LRScheduler:
     """
     Create a learning rate scheduler from dictionary configuration.
     """
-    cycle_size = ceil(max_iterations / config.cycles)
 
-    lr_scheduler: ParamScheduler
+    lr_scheduler: torch.optim.lr_scheduler.LRScheduler
     if config.type == SchedulerType.COSINE:
-        lr_scheduler = CosineAnnealingScheduler(
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer=optimizer,
-            param_name="lr",
-            start_value=config.start_value,
-            end_value=config.end_value,
-            cycle_size=cycle_size,
-            start_value_mult=config.start_value_mult,
-            end_value_mult=config.end_value_mult,
+            T_max=max_iterations - config.warmup_steps,
+            eta_min=config.end_value,
         )
     elif config.type == SchedulerType.LINEAR:
-        lr_scheduler = LinearCyclicalScheduler(
+        start_value = optimizer.param_groups[0]["lr"]
+        lr_scheduler = torch.optim.lr_scheduler.LinearLR(
             optimizer=optimizer,
-            param_name="lr",
-            start_value=config.start_value,
-            end_value=config.end_value,
-            cycle_size=cycle_size,
-            start_value_mult=config.start_value_mult,
-            end_value_mult=config.end_value_mult,
+            start_factor=1.0,
+            end_factor=config.end_value / start_value,
+            total_iters=config.warmup_steps,
         )
     else:
         raise RuntimeError(f'Unsupported LR scheduler "{config.type}".')
 
     if config.warmup_steps > 0:
-        lr_scheduler = create_lr_scheduler_with_warmup(
-            lr_scheduler=lr_scheduler,
-            warmup_start_value=0.0,
-            warmup_end_value=config.start_value,
-            warmup_duration=config.warmup_steps,
+        warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
+            optimizer=optimizer,
+            start_factor=1e-5,
+            end_factor=1.0,
+            total_iters=config.warmup_steps,
+        )
+        lr_scheduler = torch.optim.lr_scheduler.SequentialLR(
+            optimizer=optimizer,
+            schedulers=[warmup_scheduler, lr_scheduler],
+            milestones=[config.warmup_steps],
         )
 
     return lr_scheduler

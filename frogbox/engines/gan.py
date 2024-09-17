@@ -1,24 +1,21 @@
 from typing import Callable, Any, Union, Sequence, Tuple, Optional
 import torch
-from ignite.engine import Engine, DeterministicEngine, Events, _prepare_batch
-from ignite.handlers import TerminateOnNan
-from .common import _backward_with_scaler
+from ignite.engine import Engine, DeterministicEngine
+from accelerate import Accelerator
 
 
 def create_gan_trainer(
+    accelerator: Accelerator,
     model: torch.nn.Module,
     disc_model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     disc_optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler.LRScheduler,
+    disc_scheduler: torch.optim.lr_scheduler.LRScheduler,
     loss_fn: Union[Callable, torch.nn.Module],
     disc_loss_fn: Union[Callable, torch.nn.Module],
-    device: Union[str, torch.device] = "cpu",
-    amp: bool = False,
     clip_grad_norm: Optional[float] = None,
-    update_interval: int = 1,
-    disc_update_interval: int = 1,
-    non_blocking: bool = False,
-    prepare_batch: Callable = _prepare_batch,
+    clip_grad_value: Optional[float] = None,
     input_transform: Callable[[Any, Any], Any] = lambda x, y: (x, y),
     model_transform: Callable[[Any], Any] = lambda output: output,
     disc_model_transform: Callable[[Any], Any] = lambda output: output,
@@ -29,7 +26,6 @@ def create_gan_trainer(
         disc_loss.item(),
     ),
     deterministic: bool = False,
-    terminate_on_nan: bool = True,
 ) -> Engine:
     """
     Factory function for GAN trainer.
@@ -44,29 +40,20 @@ def create_gan_trainer(
         The optimizer to use for model.
     disc_optimizer : torch optimizer
         The optimizer to use for discriminator.
+    scheduler : torch LRScheduler
+        Model learning rate scheduler.
+    disc_scheduler : torch LRScheduler
+        Discriminator learning rate scheduler.
     loss_fn : torch.nn.Module
         The supervised loss function to use for model.
     disc_loss_fn : torch.nn.Module
         The loss function to use discriminator.
-    device : torch.device
-        Device type specification.
-        Applies to batches after starting the engine. Model will not be moved.
-        Device can be CPU, GPU.
-    amp : bool
-        If `true` automatic mixed-precision is enabled.
     clip_grad_norm : float
         Clip gradients to norm if provided.
     update_interval : int
         How many steps between updating `model`.
     disc_update_interval : int
         How many steps between updating `disc_model`.
-    non_blocking : bool
-        If `True` and this copy is between CPU and GPU, the copy may
-        occur asynchronously with respect to the host.
-        For other cases, this argument has no effect.
-    prepare_batch : Callable
-        Function that receives `batch`, `device`, `non_blocking`
-        and outputs tuple of tensors `(batch_x, batch_y)`.
     input_transform : Callable
         Function that receives tensors `y` and `y` and outputs tuple of
         tensors `(x, y)`.
@@ -82,23 +69,12 @@ def create_gan_trainer(
         is returning `(loss.item(), disc_loss.item())`.
     deterministic : bool
         If `True`, returns `DeterministicEngine`, otherwise `Engine`.
-    terminate_on_nan: bool
-        Terminate training if model outputs NaN or infinite.
 
     Returns
     -------
     trainer : torch.engine.Engine
         A trainer engine with GAN update function.
     """
-    device = torch.device(device)
-    if "xla" in device.type:
-        raise ValueError("TPU not supported in trainer.")
-
-    scaler = None
-    disc_scaler = None
-    if amp:
-        scaler = torch.cuda.amp.GradScaler(enabled=True)
-        disc_scaler = torch.cuda.amp.GradScaler(enabled=True)
 
     def _update(
         engine: Engine, batch: Sequence[torch.Tensor]
@@ -106,67 +82,69 @@ def create_gan_trainer(
         model.train()
         disc_model.train()
 
-        x, y = prepare_batch(batch, device=device, non_blocking=non_blocking)
+        x, y = batch
         x, y = input_transform(x, y)
 
         # Update discriminator
-        disc_loss = torch.tensor(0.0)
-        if (engine.state.iteration - 1) % disc_update_interval == 0:
+        with accelerator.accumulate(disc_model):
+            y_pred = model_transform(model(x)).detach()
+            disc_pred_real = disc_model_transform(disc_model(y))
+            disc_pred_fake = disc_model_transform(disc_model(y_pred))
+            disc_loss = disc_loss_fn(
+                y_pred,
+                y,
+                disc_real=disc_pred_real,
+                disc_fake=disc_pred_fake,
+            )
+
+            accelerator.backward(disc_loss)
+            if accelerator.sync_gradients:
+                if clip_grad_norm:
+                    accelerator.clip_grad_norm_(
+                        parameters=disc_model.parameters(),
+                        max_norm=clip_grad_norm,
+                    )
+                if clip_grad_value:
+                    accelerator.clip_grad_value_(
+                        parameters=disc_model.parameters(),
+                        clip_value=clip_grad_value,
+                    )
+
+            disc_optimizer.step()
+            disc_scheduler.step()
             disc_optimizer.zero_grad()
 
-            with torch.autocast(device_type=device.type, enabled=amp):
-                y_pred = model_transform(model(x)).detach()
-                disc_pred_real = disc_model_transform(disc_model(y))
-                disc_pred_fake = disc_model_transform(disc_model(y_pred))
-                disc_loss = disc_loss_fn(
-                    y_pred,
-                    y,
-                    disc_real=disc_pred_real,
-                    disc_fake=disc_pred_fake,
-                )
-
-            _backward_with_scaler(
-                model=disc_model,
-                optimizer=disc_optimizer,
-                loss=disc_loss,
-                iteration=engine.state.iteration,
-                clip_grad_norm=clip_grad_norm,
-                scaler=disc_scaler,
-            )
-
         # Update generator
-        loss = torch.tensor(0.0)
-        if (engine.state.iteration - 1) % update_interval == 0:
-            optimizer.zero_grad()
-
-            with torch.autocast(device_type=device.type, enabled=amp):
-                y_pred = model_transform(model(x))
-                disc_pred_fake = disc_model_transform(disc_model(y_pred))
-                loss = loss_fn(
-                    y_pred,
-                    y,
-                    disc_fake=disc_pred_fake,
-                )
-
-            _backward_with_scaler(
-                model=model,
-                optimizer=optimizer,
-                loss=loss,
-                iteration=engine.state.iteration,
-                clip_grad_norm=clip_grad_norm,
-                scaler=scaler,
+        with accelerator.accumulate(model):
+            y_pred = model_transform(model(x))
+            disc_pred_fake = disc_model_transform(disc_model(y_pred))
+            loss = loss_fn(
+                y_pred,
+                y,
+                disc_fake=disc_pred_fake,
             )
+
+            accelerator.backward(loss)
+            if accelerator.sync_gradients:
+                if clip_grad_norm:
+                    accelerator.clip_grad_norm_(
+                        parameters=model.parameters(),
+                        max_norm=clip_grad_norm,
+                    )
+                if clip_grad_value:
+                    accelerator.clip_grad_value_(
+                        parameters=model.parameters(),
+                        clip_value=clip_grad_value,
+                    )
+
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
 
         return output_transform(x, y, y_pred, loss, disc_loss)
 
     trainer = (
         Engine(_update) if not deterministic else DeterministicEngine(_update)
     )
-
-    if terminate_on_nan:
-        trainer.add_event_handler(
-            event_name=Events.ITERATION_COMPLETED,
-            handler=TerminateOnNan(),
-        )
 
     return trainer

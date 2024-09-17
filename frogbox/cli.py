@@ -4,6 +4,8 @@ from typing import Optional, Tuple, Sequence
 from pathlib import Path
 import os
 import json
+import shutil
+import subprocess
 import importlib.resources
 import click
 
@@ -13,13 +15,49 @@ def cli():
     """
     An opinionated machine learning framework.
     """
-    pass
+
+
+@cli.command(
+    context_settings=dict(
+        ignore_unknown_options=True,
+        help_option_names=[],
+    )
+)
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def launch(args):
+    """
+    Launch script.
+
+    Alias for `accelerate launch`.
+    """
+    exec_path = shutil.which("accelerate")
+    cmd = [exec_path, "launch"] + list(args)
+    env = os.environ.copy()
+    subprocess.run(cmd, env=env, check=False)
+
+
+@cli.command(
+    context_settings=dict(
+        ignore_unknown_options=True,
+        help_option_names=[],
+    )
+)
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def config(args):
+    """
+    Configure training system.
+
+    Alias for `accelerate config`.
+    """
+    exec_path = shutil.which("accelerate")
+    cmd = [exec_path, "config"] + list(args)
+    env = os.environ.copy()
+    subprocess.run(cmd, env=env, check=False)
 
 
 @cli.group()
 def project():
     """Manage project."""
-    pass
 
 
 @project.command(name="new")
@@ -131,7 +169,6 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
 @cli.group()
 def service():
     """Manage service."""
-    pass
 
 
 @service.command(name="new")
@@ -300,12 +337,11 @@ def service_dockerfile(
 
 
 @cli.group()
-def config():
-    """Work with config files."""
-    pass
+def schema():
+    """Work with config schemas."""
 
 
-@config.command()
+@schema.command()
 @click.option(
     "--file",
     "-f",
@@ -325,7 +361,7 @@ def validate(path: Path):
     read_json_config(path)
 
 
-@config.command()
+@schema.command(name="write")
 @click.option(
     "--type",
     "-t",
@@ -345,22 +381,24 @@ def validate(path: Path):
     ),
     help="Write schema to file.",
 )
-def schema(type_: str, out: Optional[Path] = None):
+def write_schema(type_: str, out: Optional[Path] = None):
     if type_ == "supervised":
         from .config import SupervisedConfig
 
-        schema = json.dumps(SupervisedConfig.model_json_schema(), indent=2)
+        schema_json = json.dumps(
+            SupervisedConfig.model_json_schema(), indent=2
+        )
     elif type_ == "gan":
         from .config import GANConfig
 
-        schema = json.dumps(GANConfig.model_json_schema(), indent=2)
+        schema_json = json.dumps(GANConfig.model_json_schema(), indent=2)
     else:
         raise RuntimeError(f"Unknown pipeline type {type_}.")
 
     if out:
-        out.write_text(schema)
+        out.write_text(schema_json)
     else:
-        print(schema)
+        print(schema_json)
 
 
 if __name__ == "__main__":

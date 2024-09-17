@@ -1,65 +1,188 @@
-from typing import Callable, Union, Optional, Any, Dict, Sequence
+from typing import (
+    Callable,
+    Union,
+    Optional,
+    Any,
+    Dict,
+    Sequence,
+    Mapping,
+    Tuple,
+)
 from abc import ABC, abstractmethod
+import os
 from os import PathLike
 from pathlib import Path
-from ignite.engine import Engine, Events, CallableEventWithFilter
-from ignite.handlers import global_step_from_engine, Checkpoint, DiskSaver
-from ignite.contrib.handlers.wandb_logger import WandBLogger
+import datetime
+import tempfile
+import stat
 import torch
-import wandb
-from ..config import Config, CheckpointMode, parse_log_interval
+from torch.utils.data import Dataset, DataLoader
+from ignite.engine import Engine, Events, CallableEventWithFilter
+from ignite.handlers import global_step_from_engine, Checkpoint
+from ignite.handlers.checkpoint import BaseSaveHandler
+from ignite.handlers.base_logger import BaseLogger
+from accelerate import Accelerator
+from ..config import (
+    Config,
+    CheckpointMode,
+    ObjectDefinition,
+    create_object_from_config,
+    parse_log_interval,
+)
+
+
+class NoneSaveHandler(BaseSaveHandler):
+    def __call__(
+        self,
+        checkpoint: Mapping,
+        filename: str,
+        metadata: Optional[Mapping] = None,
+    ) -> None:
+        pass
+
+    def remove(self, filename: str) -> None:
+        pass
+
+
+class AccelerateDiskSaver(BaseSaveHandler):
+    def __init__(
+        self,
+        dirname: Union[str, PathLike],
+        accelerator: Accelerator,
+        to_unwrap: Optional[Sequence[str]] = None,
+        atomic: bool = True,
+        **kwargs,
+    ):
+        self.dirname = Path(dirname).expanduser()
+        self.accelerator = accelerator
+        self.to_unwrap = to_unwrap
+        self.atomic = atomic
+        self.kwargs = kwargs
+
+        if not self.dirname.exists():
+            self.dirname.mkdir(parents=True)
+
+    def __call__(
+        self,
+        checkpoint: Mapping,
+        filename: str,
+        metadata: Optional[Mapping] = None,
+    ) -> None:
+        to_unwrap = self.to_unwrap if self.to_unwrap else []
+        unwrapped_checkpoint = {}
+        for key in checkpoint:
+            unwrapped_checkpoint[key] = (
+                self.accelerator.unwrap_model(checkpoint[key])
+                if key in to_unwrap
+                else checkpoint[key]
+            )
+
+        path = self.dirname / filename
+        self._save_func(unwrapped_checkpoint, path, self.accelerator.save)
+
+    def _save_func(
+        self, checkpoint: Mapping, path: Path, func: Callable
+    ) -> None:
+        if not self.atomic:
+            func(checkpoint, path, **self.kwargs)
+        else:
+            tmp = tempfile.NamedTemporaryFile(delete=False, dir=self.dirname)
+            tmp_file = tmp.file
+            tmp_name = tmp.name
+            try:
+                func(checkpoint, tmp_file, **self.kwargs)
+            except BaseException:
+                tmp.close()
+                os.remove(tmp_name)
+                raise
+            else:
+                tmp.close()
+                os.replace(tmp.name, path)
+                # append group/others read mode
+                os.chmod(
+                    path, os.stat(path).st_mode | stat.S_IRGRP | stat.S_IROTH
+                )
+
+    def remove(self, filename: str) -> None:
+        path = self.dirname / filename
+        path.unlink()
 
 
 class Pipeline(ABC):
     """Pipeline abstract base class."""
 
     config: Config
+    accelerator: Accelerator
     trainer: Engine
-    device: torch.device
-    logger: WandBLogger
+    logger: BaseLogger
     checkpoint: Checkpoint
-    run_name: str
 
     @abstractmethod
     def run(self) -> None: ...
 
-    def _setup_logger(
+    def _create_data_loaders(
         self,
-        wandb_id: Optional[str],
-        mode: Optional[str] = "online",
-        tags: Optional[Sequence[str]] = None,
-        group: Optional[str] = None,
-    ) -> None:
-        assert mode in (
-            "online",
-            "offline",
-        ), 'mode must be one of "online" or "offline".'
+        batch_size: int,
+        loader_workers: int,
+        datasets: Dict[str, ObjectDefinition],
+        loaders: Optional[Dict[str, ObjectDefinition]] = None,
+    ) -> Tuple[Dict[str, Dataset], Dict[str, DataLoader]]:
+        if loaders is None:
+            loaders = {}
 
-        self.logger = WandBLogger(
-            id=wandb_id,
-            mode=mode,
-            tags=tags,
-            group=group,
-            resume="allow" if mode == "online" else None,
-            project=self.config.project,
-            config=dict(config=self.config.model_dump()),
-        )
+        out_datasets = {}
+        out_loaders = {}
 
-        if wandb.run is not None:
-            if mode == "online":
-                self.run_name = wandb.run.name
-            else:
-                self.run_name = f"offline-{wandb.run.id}"
+        with self.accelerator.local_main_process_first():
+            for split in datasets.keys():
+                ds = create_object_from_config(datasets[split])
+                out_datasets[split] = ds
+
+                if split in loaders:
+                    out_loaders[split] = create_object_from_config(
+                        loaders[split],
+                        dataset=ds,
+                        batch_size=batch_size,
+                        num_workers=loader_workers,
+                    )
+                else:
+                    out_loaders[split] = DataLoader(
+                        dataset=ds,
+                        batch_size=batch_size,
+                        num_workers=loader_workers,
+                        shuffle=split == "train",
+                    )
+
+        return out_datasets, out_loaders
 
     def _setup_checkpoint(
         self,
         to_save: Dict[str, Any],
         checkpoint_dir: Union[str, PathLike],
+        to_unwrap: Optional[Sequence[str]] = None,
     ) -> None:
-        assert self.run_name is not None, "Run name not set."
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+        run_name = f"{self.config.project}_{timestamp}"
 
         log_interval = parse_log_interval(self.config.log_interval)
-        run_dir = Path(checkpoint_dir) / self.run_name
+        run_dir = Path(checkpoint_dir) / run_name
+
+        save_handler: BaseSaveHandler
+        if self.accelerator.is_main_process:
+            save_handler = AccelerateDiskSaver(
+                dirname=str(run_dir),
+                accelerator=self.accelerator,
+                to_unwrap=to_unwrap,
+            )
+
+            config_json = self.config.model_dump_json(
+                indent=True, exclude_none=True
+            )
+            run_dir.mkdir(parents=True, exist_ok=True)
+            with (run_dir / "config.json").open("w") as fp:
+                fp.write(config_json)
+        else:
+            save_handler = NoneSaveHandler()
 
         score_function = None
         if self.config.checkpoint_metric:
@@ -72,12 +195,6 @@ class Pipeline(ABC):
                 ),
             )
 
-        save_handler = DiskSaver(
-            dirname=str(run_dir),
-            create_dir=True,
-            require_empty=False,
-        )
-
         self.checkpoint = Checkpoint(
             to_save=to_save,
             save_handler=save_handler,
@@ -89,14 +206,6 @@ class Pipeline(ABC):
                 Events(log_interval.value),
             ),
         )
-
-        # Write config.json to checkpoint directory
-        config_json = self.config.model_dump_json(
-            indent=True, exclude_none=True
-        )
-        run_dir.mkdir(parents=True, exist_ok=True)
-        with (run_dir / "config.json").open("w") as fp:
-            fp.write(config_json)
 
     def _load_checkpoint(
         self,
@@ -119,14 +228,20 @@ class Pipeline(ABC):
         self,
         event: Union[Events, CallableEventWithFilter],
         callback: Callable[["Pipeline"], None],
+        only_main_process: bool = False,
     ) -> None:
         """Install callback in pipeline."""
-        self.trainer.add_event_handler(
-            event_name=event,
-            handler=callback,
-            pipeline=self,
-        )
+        if not only_main_process or self.accelerator.is_main_process:
+            self.trainer.add_event_handler(
+                event_name=event,
+                handler=callback,
+                pipeline=self,
+            )
 
     def log(self, data: Dict[str, Any]) -> None:
-        """Log data to Weights & Biases."""
-        self.logger.log(step=self.trainer.state.iteration, data=data)
+        """Log data to tracker(s)."""
+        self.accelerator.log(data, step=self.trainer.state.iteration)
+
+    def print(self, *args, **kwargs) -> None:
+        """Drop in replacement of print() to only print once per server."""
+        self.accelerator.print(*args, **kwargs)

@@ -1,7 +1,6 @@
 {
     "type": "supervised",
     "project": "frogbox-example",
-    "amp": true,
     "batch_size": 32,
     "loader_workers": 4,
     "max_epochs": 16,
