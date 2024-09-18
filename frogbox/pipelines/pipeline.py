@@ -32,6 +32,7 @@ from ..config import (
 
 
 class NoneSaveHandler(BaseSaveHandler):
+    """@private"""
     def __call__(
         self,
         checkpoint: Mapping,
@@ -45,6 +46,7 @@ class NoneSaveHandler(BaseSaveHandler):
 
 
 class AccelerateDiskSaver(BaseSaveHandler):
+    """@private"""
     def __init__(
         self,
         dirname: Union[str, PathLike],
@@ -230,7 +232,18 @@ class Pipeline(ABC):
         callback: Callable[["Pipeline"], None],
         only_main_process: bool = False,
     ) -> None:
-        """Install callback in pipeline."""
+        """
+        Install callback in pipeline.
+
+        Parameters
+        ----------
+        event : Events
+            Event to trigger callback at.
+        callback : callable
+            Callback to install.
+        only_main_process : bool
+            Install only in main process. Only affects distributed setups.
+        """
         if not only_main_process or self.accelerator.is_main_process:
             self.trainer.add_event_handler(
                 event_name=event,
