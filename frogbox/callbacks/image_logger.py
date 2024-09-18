@@ -142,34 +142,37 @@ def create_image_logger(
         for batch in data_iter:
             x, y = batch
             x, y = input_transform(x, y)
+
             with torch.inference_mode():
                 y_pred = model_transform(model(x))
 
-                x, y, y_pred = convert_tensor(  # type: ignore
-                    x=(x, y, y_pred),
-                    device=torch.device("cpu"),
-                    non_blocking=False,
+            x, y, y_pred = pipeline.gather_for_metrics((x, y, y_pred))
+
+            x, y, y_pred = convert_tensor(  # type: ignore
+                x=(x, y, y_pred),
+                device=torch.device("cpu"),
+                non_blocking=False,
+            )
+
+            if denormalize_input:
+                x = denormalize(x)
+            if denormalize_target:
+                y = denormalize(y)
+                y_pred = denormalize(y_pred)
+
+            output = output_transform(x, y, y_pred)
+
+            batch_sizes = [len(e) for e in output]
+            assert all(s == batch_sizes[0] for s in batch_sizes)
+            for i in range(batch_sizes[0]):
+                grid = _combine_test_images(
+                    images=[e[i] for e in output],
+                    resize_to_fit=resize_to_fit,
+                    interpolation=interpolation,
+                    antialias=antialias,
+                    num_cols=num_cols,
                 )
-
-                if denormalize_input:
-                    x = denormalize(x)
-                if denormalize_target:
-                    y = denormalize(y)
-                    y_pred = denormalize(y_pred)
-
-                output = output_transform(x, y, y_pred)
-
-                batch_sizes = [len(e) for e in output]
-                assert all(s == batch_sizes[0] for s in batch_sizes)
-                for i in range(batch_sizes[0]):
-                    grid = _combine_test_images(
-                        images=[e[i] for e in output],
-                        resize_to_fit=resize_to_fit,
-                        interpolation=interpolation,
-                        antialias=antialias,
-                        num_cols=num_cols,
-                    )
-                    images.append(grid)
+                images.append(grid)
 
         wandb_images = [wandb.Image(to_pil_image(image)) for image in images]
         pipeline.log({log_label: wandb_images})

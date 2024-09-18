@@ -243,5 +243,16 @@ class Pipeline(ABC):
         self.accelerator.log(data, step=self.trainer.state.iteration)
 
     def print(self, *args, **kwargs) -> None:
-        """Drop in replacement of print() to only print once per server."""
+        """Drop in replacement of `print()` to only print once per server."""
         self.accelerator.print(*args, **kwargs)
+
+    def gather_for_metrics(self, input_data, use_gather_object: bool = False):
+        """Gathers `input_data` and potentially drops duplicates in the last
+        batch if on a distributed system. Should be used for gathering the
+        inputs and targets for metric calculation.
+
+        Wrapper around `Accelerator.gather_for_metrics()
+        <https://huggingface.co/docs/accelerate/main/en/package_reference/accelerator#accelerate.Accelerator.gather_for_metrics>`_."""  # noqa: E501, W505
+        return self.accelerator.gather_for_metrics(
+            input_data, use_gather_object
+        )
