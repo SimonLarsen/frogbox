@@ -192,6 +192,10 @@ class Pipeline(ABC):
         )
 
     @property
+    def device(self) -> torch.device:
+        return self.accelerator.device
+
+    @property
     def is_main_process(self) -> bool:
         """True for one process only."""
         return self.accelerator.is_main_process
