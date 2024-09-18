@@ -33,6 +33,7 @@ from ..config import (
 
 class NoneSaveHandler(BaseSaveHandler):
     """@private"""
+
     def __call__(
         self,
         checkpoint: Mapping,
@@ -47,6 +48,7 @@ class NoneSaveHandler(BaseSaveHandler):
 
 class AccelerateDiskSaver(BaseSaveHandler):
     """@private"""
+
     def __init__(
         self,
         dirname: Union[str, PathLike],
@@ -265,7 +267,18 @@ class Pipeline(ABC):
         inputs and targets for metric calculation.
 
         Wrapper around `Accelerator.gather_for_metrics()
-        <https://huggingface.co/docs/accelerate/main/en/package_reference/accelerator#accelerate.Accelerator.gather_for_metrics>`_."""  # noqa: E501, W505
+        <https://huggingface.co/docs/accelerate/main/en/package_reference/accelerator#accelerate.Accelerator.gather_for_metrics>`_.
+        """  # noqa: E501, W505
         return self.accelerator.gather_for_metrics(
             input_data, use_gather_object
         )
+
+    @property
+    def is_main_process(self) -> bool:
+        """True for one process only."""
+        return self.accelerator.is_main_process
+
+    @property
+    def is_local_main_process(self) -> bool:
+        """True for one process per server."""
+        return self.accelerator.is_local_main_process

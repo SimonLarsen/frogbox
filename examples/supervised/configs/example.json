@@ -35,15 +35,6 @@
             "params": {"data_range": 1.0}
         }
     },
-    "loaders": {
-        "train": {
-            "class_name": "torch.utils.data.DataLoader",
-            "params": {
-                "shuffle": true,
-                "drop_last": true
-            }
-        }
-    },
     "lr_scheduler": {
         "type": "cosine",
         "start_value": 3e-4,
