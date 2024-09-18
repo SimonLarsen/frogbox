@@ -228,6 +228,8 @@ class Pipeline(ABC):
             ),
         )
 
+        self.accelerator.wait_for_everyone()
+
     def install_callback(
         self,
         event: Union[Events, CallableEventWithFilter],
