@@ -1,7 +1,6 @@
 from typing import Optional, Sequence
 from pathlib import Path
 import argparse
-import torch
 from frogbox import read_json_config, SupervisedPipeline, Events
 from frogbox.callbacks import create_image_logger
 
@@ -12,9 +11,6 @@ def parse_arguments(
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-c", "--config", type=Path, default="configs/example.json"
-    )
-    parser.add_argument(
-        "-d", "--device", type=torch.device, default=torch.device("cuda:0")
     )
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--checkpoint-keys", type=str, nargs="+")
@@ -36,14 +32,12 @@ if __name__ == "__main__":
 
     pipeline = SupervisedPipeline(
         config=config,
-        device=args.device,
         checkpoint=args.checkpoint,
         checkpoint_keys=args.checkpoint_keys,
         logging=args.logging,
         wandb_id=args.wandb_id,
         tags=args.tags,
         group=args.group,
-        evaluator_model_transform=lambda y_pred: y_pred.float(),
     )
 
     dataset_params = config.datasets["test"].params
@@ -52,7 +46,6 @@ if __name__ == "__main__":
         normalize_mean=dataset_params["normalize_mean"],
         normalize_std=dataset_params["normalize_std"],
         denormalize_input=dataset_params["do_normalize"],
-        model_transform=lambda y_pred: y_pred.float(),
     )
 
     pipeline.install_callback(

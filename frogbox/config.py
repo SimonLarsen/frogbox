@@ -1,4 +1,4 @@
-from typing import Union, Dict, Any, Optional
+from typing import Union, Dict, Sequence, Any, Optional
 from os import PathLike
 import warnings
 from enum import Enum
@@ -101,12 +101,16 @@ class LRSchedulerDefinition(BaseModel):
     """
 
     type: SchedulerType = SchedulerType.COSINE
-    start_value: float = 3e-4
     end_value: float = 1e-7
-    cycles: int = Field(1, ge=1)
-    start_value_mult: float = Field(1.0, gt=0.0)
-    end_value_mult: float = Field(1.0, gt=0.0)
     warmup_steps: int = Field(0, ge=0)
+
+
+class CheckpointDefinition(BaseModel):
+    """Checkpoint definition."""
+    metric: Optional[str] = None
+    mode: CheckpointMode = CheckpointMode.MAX
+    n_saved: int = Field(3, ge=1)
+    interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
 
 
 class Config(BaseModel):
@@ -134,10 +138,14 @@ class Config(BaseModel):
 
     type: ConfigType
     project: str
-    checkpoint_metric: Optional[str] = None
-    checkpoint_mode: CheckpointMode = CheckpointMode.MAX
-    checkpoint_n_saved: int = Field(3, ge=1)
     log_interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
+    checkpoints: Sequence[CheckpointDefinition] = (
+        CheckpointDefinition(
+            metric=None,
+            n_saved=3,
+            interval=Events.EPOCH_COMPLETED,
+        ),
+    )
 
 
 class SupervisedConfig(Config):
@@ -146,8 +154,6 @@ class SupervisedConfig(Config):
 
     Attributes
     ----------
-    amp : bool
-        If `true` automatic mixed-precision is enabled.
     batch_size : int
         Batch size.
     loader_workers : int
@@ -157,6 +163,8 @@ class SupervisedConfig(Config):
         Maximum number of epochs to train for.
     clip_grad_norm : float
         Clip gradients to norm if provided.
+    clip_grad_norm : float
+        Clip gradients to value if provided.
     gradient_accumulation_steps : int
         Number of steps the gradients should be accumulated across.
     datasets : dict of ObjectDefinition
@@ -175,11 +183,11 @@ class SupervisedConfig(Config):
         Learning rate scheduler.
     """
 
-    amp: bool = False
     batch_size: int = Field(32, ge=1)
     loader_workers: int = Field(0, ge=0)
     max_epochs: int = Field(32, ge=1)
     clip_grad_norm: Optional[float] = None
+    clip_grad_value: Optional[float] = None
     gradient_accumulation_steps: int = Field(1, ge=1)
     datasets: Dict[str, ObjectDefinition]
     loaders: Dict[str, ObjectDefinition] = dict()
@@ -213,8 +221,6 @@ class GANConfig(SupervisedConfig):
         class_name="torch.optim.AdamW"
     )
     disc_lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
-    update_interval: int = Field(1, ge=1)
-    disc_update_interval: int = Field(1, ge=1)
 
 
 def read_json_config(path: Union[str, PathLike]) -> Config:

@@ -1,7 +1,6 @@
 from typing import cast, Optional, Sequence
 from pathlib import Path
 import argparse
-import torch
 from frogbox import read_json_config, SupervisedPipeline, SupervisedConfig
 
 
@@ -11,9 +10,6 @@ def parse_arguments(
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-c", "--config", type=Path, default="configs/example.json"
-    )
-    parser.add_argument(
-        "-d", "--device", type=torch.device, default=torch.device("cuda:0")
     )
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--checkpoint-keys", type=str, nargs="+")
@@ -35,7 +31,6 @@ if __name__ == "__main__":
 
     pipeline = SupervisedPipeline(
         config=config,
-        device=args.device,
         checkpoint=args.checkpoint,
         checkpoint_keys=args.checkpoint_keys,
         logging=args.logging,
