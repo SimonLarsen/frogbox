@@ -3,7 +3,7 @@ from os import PathLike
 from pathlib import Path
 import torch
 from torch.utils.data import Dataset, DataLoader
-from ignite.engine import Engine, Events
+from ignite.engine import Events
 from ignite.handlers import global_step_from_engine
 from ignite.contrib.handlers import ProgressBar
 from accelerate import Accelerator
@@ -29,7 +29,6 @@ class SupervisedPipeline(Pipeline):
     """Supervised pipeline."""
 
     config: SupervisedConfig
-    evaluator: Engine
     datasets: Dict[str, Dataset]
     loaders: Dict[str, DataLoader]
     model: torch.nn.Module
@@ -215,7 +214,7 @@ class SupervisedPipeline(Pipeline):
             "trainer": self.trainer,
             "lr_scheduler": self.lr_scheduler,
         }
-        self._setup_checkpoint(
+        self._setup_checkpoints(
             to_save=to_save,
             checkpoint_dir=checkpoint_dir,
             to_unwrap=["model"],
@@ -223,7 +222,11 @@ class SupervisedPipeline(Pipeline):
 
         # Load checkpoint
         if checkpoint:
-            self._load_checkpoint(checkpoint, checkpoint_keys)
+            self._load_checkpoint(
+                path=checkpoint,
+                to_load=to_save,
+                keys=checkpoint_keys,
+            )
 
         # Set up logging
         if self.accelerator.is_main_process:
@@ -238,7 +241,6 @@ class SupervisedPipeline(Pipeline):
             self.trainer.add_event_handler(
                 Events.ITERATION_COMPLETED, log_losses
             )
-            self.evaluator.add_event_handler(Events.COMPLETED, self.checkpoint)
 
             self.logger = AccelerateLogger(self.accelerator)
             self.logger.attach_output_handler(

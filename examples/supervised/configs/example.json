@@ -4,9 +4,21 @@
     "batch_size": 16,
     "loader_workers": 4,
     "max_epochs": 16,
-    "checkpoint_mode": "max",
-    "checkpoint_metric": "PSNR",
     "log_interval": "epoch_completed",
+    "checkpoints": [
+        {
+            "n_saved": 3,
+            "interval": {
+                "event": "iteration_completed",
+                "every": 500
+            }
+        },
+        {
+            "metric": "SSIM",
+            "mode": "max",
+            "n_saved": 1
+        }
+    ],
     "datasets": {% include 'datasets.json' %},
     "model": {
         "class_name": "models.example.ExampleModel",

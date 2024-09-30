@@ -1,4 +1,4 @@
-from typing import Union, Dict, Any, Optional
+from typing import Union, Dict, Sequence, Any, Optional
 from os import PathLike
 import warnings
 from enum import Enum
@@ -105,6 +105,14 @@ class LRSchedulerDefinition(BaseModel):
     warmup_steps: int = Field(0, ge=0)
 
 
+class CheckpointDefinition(BaseModel):
+    """Checkpoint definition."""
+    metric: Optional[str] = None
+    mode: CheckpointMode = CheckpointMode.MAX
+    n_saved: int = Field(3, ge=1)
+    interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
+
+
 class Config(BaseModel):
     """
     Base configuration.
@@ -130,10 +138,14 @@ class Config(BaseModel):
 
     type: ConfigType
     project: str
-    checkpoint_metric: Optional[str] = None
-    checkpoint_mode: CheckpointMode = CheckpointMode.MAX
-    checkpoint_n_saved: int = Field(3, ge=1)
     log_interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
+    checkpoints: Sequence[CheckpointDefinition] = (
+        CheckpointDefinition(
+            metric=None,
+            n_saved=3,
+            interval=Events.EPOCH_COMPLETED,
+        ),
+    )
 
 
 class SupervisedConfig(Config):

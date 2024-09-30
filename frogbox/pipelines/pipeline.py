@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from os import PathLike
 from pathlib import Path
 import datetime
+from functools import partial
 import torch
 from torch.utils.data import Dataset, DataLoader
 from ignite.engine import Engine, Events, CallableEventWithFilter
@@ -34,8 +35,8 @@ class Pipeline(ABC):
     config: Config
     accelerator: Accelerator
     trainer: Engine
+    evaluator: Engine
     logger: BaseLogger
-    checkpoint: Checkpoint
 
     @abstractmethod
     def run(self) -> None: ...
@@ -75,7 +76,7 @@ class Pipeline(ABC):
 
         return out_datasets, out_loaders
 
-    def _setup_checkpoint(
+    def _setup_checkpoints(
         self,
         to_save: Dict[str, Any],
         checkpoint_dir: Union[str, PathLike],
@@ -84,7 +85,6 @@ class Pipeline(ABC):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
         run_name = f"{self.config.project}_{timestamp}"
 
-        log_interval = parse_log_interval(self.config.log_interval)
         run_dir = Path(checkpoint_dir) / run_name
 
         save_handler: BaseSaveHandler
@@ -104,38 +104,51 @@ class Pipeline(ABC):
         else:
             save_handler = NoneSaveHandler()
 
-        score_function = None
-        if self.config.checkpoint_metric:
-            score_function = Checkpoint.get_default_score_fn(
-                metric_name=self.config.checkpoint_metric,
-                score_sign=(
-                    1.0
-                    if self.config.checkpoint_mode == CheckpointMode.MAX
+        def evaluator_score_fn(
+            engine: Engine,
+            evaluator: Engine,
+            metric: str,
+            sign: float,
+        ):
+            return sign * evaluator.state.metrics[metric]
+
+        for checkpoint in self.config.checkpoints:
+            score_function = None
+            if checkpoint.metric:
+                score_sign = (
+                    1.0 if checkpoint.mode == CheckpointMode.MAX
                     else -1.0
+                )
+                score_function = partial(
+                    evaluator_score_fn,
+                    evaluator=self.evaluator,
+                    metric=checkpoint.metric,
+                    sign=score_sign,
+                )
+
+            log_interval = parse_log_interval(checkpoint.interval)
+            handler = Checkpoint(
+                to_save=to_save,
+                save_handler=save_handler,
+                score_name=checkpoint.metric,
+                score_function=score_function,
+                n_saved=checkpoint.n_saved,
+                global_step_transform=global_step_from_engine(
+                    self.trainer,
+                    Events(log_interval.value),
                 ),
             )
-
-        self.checkpoint = Checkpoint(
-            to_save=to_save,
-            save_handler=save_handler,
-            score_name=self.config.checkpoint_metric,
-            score_function=score_function,
-            n_saved=self.config.checkpoint_n_saved,
-            global_step_transform=global_step_from_engine(
-                self.trainer,
-                Events(log_interval.value),
-            ),
-        )
+            self.trainer.add_event_handler(log_interval, handler)
 
     def _load_checkpoint(
         self,
         path: Union[str, PathLike],
+        to_load: Dict[str, Any],
         keys: Optional[Sequence[str]] = None,
     ) -> None:
-        to_save = self.checkpoint.to_save
         if keys is None:
-            keys = list(to_save.keys())
-        to_load = {k: to_save[k] for k in keys}
+            keys = list(to_load.keys())
+        to_load = {k: to_load[k] for k in keys}
 
         Checkpoint.load_objects(
             to_load=to_load,

@@ -5,8 +5,12 @@
     "batch_size": 32,
     "loader_workers": 4,
     "max_epochs": 16,
-    "checkpoint_mode": "max",
-    "checkpoint_metric": "PSNR",
+    "checkpoints": [
+        {
+            "metric": "PSNR",
+            "mode": "max"
+        }
+    ],
     "log_interval": "epoch_completed",
     "datasets": {% include 'datasets.json' %},
     "disc_update_interval": 2,
