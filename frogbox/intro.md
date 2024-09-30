@@ -7,10 +7,18 @@ frogbox project new -t supervised -d .
 ```
 
 Implement your model in `models`, your dataset in `datasets` and your pipeline configuration in `configs`.
-Then train the model by running `train.py`:
+
+If you need to use distributed training or have a system with more than one CUDA device,
+configure your training system:
 
 ```sh
-frogbox train.py -c configs/config.json -d cuda:0
+frogbox config
+```
+
+Then launch the training pipeline:
+
+```sh
+frogbox launch train.py -c configs/config.json
 ```
 
 See example projects in `examples`.
