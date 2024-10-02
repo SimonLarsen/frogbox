@@ -87,6 +87,7 @@ def create_gan_trainer(
 
         # Update discriminator
         with accelerator.accumulate(disc_model):
+            disc_optimizer.zero_grad()
             y_pred = model_transform(model(x)).detach()
             disc_pred_real = disc_model_transform(disc_model(y))
             disc_pred_fake = disc_model_transform(disc_model(y_pred))
@@ -112,10 +113,10 @@ def create_gan_trainer(
 
             disc_optimizer.step()
             disc_scheduler.step()
-            disc_optimizer.zero_grad()
 
         # Update generator
         with accelerator.accumulate(model):
+            optimizer.zero_grad()
             y_pred = model_transform(model(x))
             disc_pred_fake = disc_model_transform(disc_model(y_pred))
             loss = loss_fn(
@@ -139,7 +140,6 @@ def create_gan_trainer(
 
             optimizer.step()
             scheduler.step()
-            optimizer.zero_grad()
 
         return output_transform(x, y, y_pred, loss, disc_loss)
 

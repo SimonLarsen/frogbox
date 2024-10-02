@@ -65,6 +65,7 @@ def create_supervised_trainer(
         x, y = input_transform(x, y)
 
         with accelerator.accumulate(model):
+            optimizer.zero_grad()
             y_pred = model_transform(model(x))
             loss = loss_fn(y_pred, y)
 
@@ -83,7 +84,6 @@ def create_supervised_trainer(
 
             optimizer.step()
             scheduler.step()
-            optimizer.zero_grad()
 
         return output_transform(x, y, y_pred, loss)
 
