@@ -20,6 +20,7 @@ from ignite.handlers.checkpoint import BaseSaveHandler
 from ignite.handlers.base_logger import BaseLogger
 from accelerate import Accelerator
 from .save_handler import NoneSaveHandler, AccelerateDiskSaver
+from .name_generation import generate_name
 from ..config import (
     Config,
     CheckpointMode,
@@ -37,9 +38,16 @@ class Pipeline(ABC):
     trainer: Engine
     evaluator: Engine
     logger: BaseLogger
+    run_name: str
 
     @abstractmethod
     def run(self) -> None: ...
+
+    def _generate_name(self) -> None:
+        suffix = generate_name()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        timestamp = now.strftime("%Y%m%d-%H%M%S")
+        self.run_name = f"{timestamp}-{suffix}"
 
     def _create_data_loaders(
         self,
@@ -82,10 +90,7 @@ class Pipeline(ABC):
         checkpoint_dir: Union[str, PathLike],
         to_unwrap: Optional[Sequence[str]] = None,
     ) -> None:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
-        run_name = f"{self.config.project}_{timestamp}"
-
-        run_dir = Path(checkpoint_dir) / run_name
+        run_dir = Path(checkpoint_dir) / self.run_name
 
         save_handler: BaseSaveHandler
         if self.accelerator.is_main_process:
@@ -158,6 +163,27 @@ class Pipeline(ABC):
         )
 
         self.accelerator.wait_for_everyone()
+
+    def _setup_tracking(
+        self,
+        mode: str,
+        wandb_id: Optional[str] = None,
+        tags: Optional[Sequence[str]] = None,
+        group: Optional[str] = None,
+    ) -> None:
+        self.accelerator.init_trackers(
+            self.config.project,
+            config=self.config.model_dump(),
+            init_kwargs={
+                "wandb": {
+                    "id": wandb_id,
+                    "mode": mode,
+                    "name": self.run_name,
+                    "tags": tags,
+                    "group": group,
+                }
+            },
+        )
 
     def install_callback(
         self,
