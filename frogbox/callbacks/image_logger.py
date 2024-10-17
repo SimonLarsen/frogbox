@@ -42,7 +42,7 @@ image_logger = create_image_logger(
 ```
 """  # noqa: E501
 
-from typing import Callable, Any, Sequence, Optional
+from typing import Callable, Any, Sequence, Optional, Union
 import torch
 from torchvision.transforms.functional import (
     InterpolationMode,
@@ -56,6 +56,7 @@ from kornia.enhance import Denormalize
 import wandb
 import tqdm
 from ..pipelines.supervised import SupervisedPipeline
+from ..pipelines.gan import GANPipeline
 
 
 def create_image_logger(
@@ -122,7 +123,7 @@ def create_image_logger(
         torch.as_tensor(normalize_std),
     )
 
-    def _callback(pipeline: SupervisedPipeline):
+    def _callback(pipeline: Union[SupervisedPipeline, GANPipeline]):
         model = pipeline.model
         loaders = pipeline.loaders
 
