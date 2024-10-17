@@ -78,7 +78,7 @@ from os import PathLike
 from pathlib import Path
 import torch
 from torch.utils.data import Dataset, DataLoader
-from ignite.engine import Events
+from ignite.engine import Events, CallableEventWithFilter
 from ignite.handlers import global_step_from_engine
 from ignite.contrib.handlers import ProgressBar
 from accelerate import Accelerator
@@ -102,6 +102,7 @@ class GANPipeline(Pipeline):
     """GAN pipeline."""
 
     config: GANConfig
+    log_interval: Union[Events, CallableEventWithFilter]
     datasets: Dict[str, Dataset]
     loaders: Dict[str, DataLoader]
     model: torch.nn.Module
@@ -202,27 +203,13 @@ class GANPipeline(Pipeline):
 
         # Parse config
         self.config = config
-        log_interval = parse_log_interval(config.log_interval)
+        self.log_interval = parse_log_interval(config.log_interval)
+        self._generate_name()
 
         # Create accelerator
         self.accelerator = Accelerator(
             gradient_accumulation_steps=config.gradient_accumulation_steps,
             log_with="wandb",
-        )
-
-        # Set up trackers
-        self.accelerator.init_trackers(
-            config.project,
-            config=self.config.model_dump(),
-            init_kwargs={
-                "wandb": {
-                    "id": wandb_id,
-                    "mode": logging,
-                    "tags": tags,
-                    "group": group,
-                    "resume": "allow" if logging == "online" else None,
-                }
-            },
         )
 
         # Create datasets and data loaders
@@ -313,7 +300,7 @@ class GANPipeline(Pipeline):
         )
 
         self.trainer.add_event_handler(
-            event_name=log_interval,
+            event_name=self.log_interval,
             handler=lambda: self.evaluator.run(self.loaders["val"]),
         )
 
@@ -341,6 +328,13 @@ class GANPipeline(Pipeline):
             )
 
         # Set up logging
+        self._setup_tracking(
+            mode=logging,
+            wandb_id=wandb_id,
+            tags=tags,
+            group=group,
+        )
+
         if self.accelerator.is_main_process:
             ProgressBar(desc="Train", ncols=80).attach(self.trainer)
             ProgressBar(desc="Val", ncols=80).attach(self.evaluator)
