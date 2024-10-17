@@ -187,7 +187,7 @@ class Pipeline(ABC):
 
     def install_callback(
         self,
-        event: Union[Events, CallableEventWithFilter],
+        event: CallableEventWithFilter,
         callback: Callable[["Pipeline"], None],
         only_main_process: bool = False,
     ) -> None:

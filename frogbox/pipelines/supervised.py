@@ -29,7 +29,7 @@ class SupervisedPipeline(Pipeline):
     """Supervised pipeline."""
 
     config: SupervisedConfig
-    log_interval: Union[Events, CallableEventWithFilter]
+    log_interval: CallableEventWithFilter
     datasets: Dict[str, Dataset]
     loaders: Dict[str, DataLoader]
     model: torch.nn.Module

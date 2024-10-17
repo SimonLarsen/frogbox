@@ -247,7 +247,7 @@ def read_json_config(path: Union[str, PathLike]) -> Config:
 
 def parse_log_interval(
     e: Union[Events, LogInterval]
-) -> Union[Events, CallableEventWithFilter]:
+) -> CallableEventWithFilter:
     """
     Create ignite event from string or dictionary configuration.
     Dictionary must have a ``event`` entry.
