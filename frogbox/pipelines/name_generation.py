@@ -1,4 +1,4 @@
-import random
+import numpy as np
 
 
 ADJECTIVES = [
@@ -451,6 +451,7 @@ ANIMALS = [
 
 
 def generate_name() -> str:
-    adj = random.choice(ADJECTIVES)
-    noun = random.choice(ANIMALS)
+    rng = np.random.default_rng()
+    adj = rng.choice(ADJECTIVES)
+    noun = rng.choice(ANIMALS)
     return f"{adj}-{noun}"
