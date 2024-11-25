@@ -46,7 +46,7 @@ class Pipeline(ABC):
     def _generate_name(self) -> None:
         suffix = generate_name()
         now = datetime.datetime.now(datetime.timezone.utc)
-        timestamp = now.strftime("%Y%m%d-%H%M%S")
+        timestamp = now.strftime("%Y%m%d-%H%M")
         self.run_name = f"{timestamp}-{suffix}"
 
     def _create_data_loaders(
