@@ -19,6 +19,7 @@ from ignite.handlers import global_step_from_engine, Checkpoint
 from ignite.handlers.checkpoint import BaseSaveHandler
 from ignite.handlers.base_logger import BaseLogger
 from accelerate import Accelerator
+from accelerate.utils.other import is_compiled_module
 from .save_handler import NoneSaveHandler, AccelerateDiskSaver
 from .name_generation import generate_name
 from ..config import (
@@ -97,7 +98,6 @@ class Pipeline(ABC):
             save_handler = AccelerateDiskSaver(
                 dirname=str(run_dir),
                 accelerator=self.accelerator,
-                to_unwrap=to_unwrap,
             )
 
             config_json = self.config.model_dump_json(
@@ -117,12 +117,25 @@ class Pipeline(ABC):
         ):
             return sign * evaluator.state.metrics[metric]
 
+        def unwrap_to_save_fn():
+            output = {}
+            for k, v in to_save.items():
+                if k in to_unwrap:
+                    v = self.accelerator.unwrap_model(v)
+                    if is_compiled_module(v):
+                        v = v._orig_mod
+                output[k] = v
+            return output
+
+        def handler_fn(engine: Engine, handler: Checkpoint):
+            handler.to_save = unwrap_to_save_fn()
+            return handler(engine)
+
         for checkpoint in self.config.checkpoints:
             score_function = None
             if checkpoint.metric:
                 score_sign = (
-                    1.0 if checkpoint.mode == CheckpointMode.MAX
-                    else -1.0
+                    1.0 if checkpoint.mode == CheckpointMode.MAX else -1.0
                 )
                 score_function = partial(
                     evaluator_score_fn,
@@ -133,7 +146,7 @@ class Pipeline(ABC):
 
             log_interval = parse_log_interval(checkpoint.interval)
             handler = Checkpoint(
-                to_save=to_save,
+                to_save=unwrap_to_save_fn(),
                 save_handler=save_handler,
                 score_name=checkpoint.metric,
                 score_function=score_function,
@@ -143,7 +156,10 @@ class Pipeline(ABC):
                     Events(log_interval.value),
                 ),
             )
-            self.trainer.add_event_handler(log_interval, handler)
+
+            self.trainer.add_event_handler(
+                log_interval, partial(handler_fn, handler=handler)
+            )
 
     def _load_checkpoint(
         self,
@@ -219,7 +235,8 @@ class Pipeline(ABC):
         self.accelerator.print(*args, **kwargs)
 
     def gather_for_metrics(self, input_data, use_gather_object: bool = False):
-        """Gathers `input_data` and potentially drops duplicates in the last
+        """
+        Gathers `input_data` and potentially drops duplicates in the last
         batch if on a distributed system. Should be used for gathering the
         inputs and targets for metric calculation.
 

@@ -321,7 +321,7 @@ ANIMALS = [
     "hedgehog",
     "heron",
     "herring",
-    "hippo"
+    "hippo",
     "hornet",
     "horse",
     "human",

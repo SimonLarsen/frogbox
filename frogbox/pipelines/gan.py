@@ -246,6 +246,14 @@ class GANPipeline(Pipeline):
             max_iterations=max_iterations,
         )
 
+        # Load model weights before potential compilation
+        if checkpoint:
+            self._load_checkpoint(
+                path=checkpoint,
+                to_load={"model": self.model, "disc_model": self.disc_model},
+                keys=checkpoint_keys,
+            )
+
         # Wrap with accelerator
         self.model, self.optimizer, self.lr_scheduler = (
             self.accelerator.prepare(
@@ -305,17 +313,16 @@ class GANPipeline(Pipeline):
         )
 
         # Set up checkpoints
-        to_save = {
-            "model": self.model,
-            "disc_model": self.disc_model,
-            "optimizer": self.optimizer,
-            "disc_optimizer": self.disc_optimizer,
-            "trainer": self.trainer,
-            "lr_scheduler": self.lr_scheduler,
-            "disc_lr_scheduler": self.disc_lr_scheduler,
-        }
         self._setup_checkpoints(
-            to_save=to_save,
+            to_save={
+                "model": self.model,
+                "disc_model": self.disc_model,
+                "optimizer": self.optimizer,
+                "disc_optimizer": self.disc_optimizer,
+                "trainer": self.trainer,
+                "lr_scheduler": self.lr_scheduler,
+                "disc_lr_scheduler": self.disc_lr_scheduler,
+            },
             checkpoint_dir=checkpoint_dir,
             to_unwrap=["model", "disc_model"],
         )
@@ -323,7 +330,13 @@ class GANPipeline(Pipeline):
         if checkpoint:
             self._load_checkpoint(
                 path=checkpoint,
-                to_load=to_save,
+                to_load={
+                    "optimizer": self.optimizer,
+                    "disc_optimizer": self.disc_optimizer,
+                    "trainer": self.trainer,
+                    "lr_scheduler": self.lr_scheduler,
+                    "disc_lr_scheduler": self.disc_lr_scheduler,
+                },
                 keys=checkpoint_keys,
             )
 

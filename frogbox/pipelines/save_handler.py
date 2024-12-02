@@ -1,4 +1,4 @@
-from typing import Union, Optional, Callable, Mapping, Sequence
+from typing import Union, Optional, Callable, Mapping
 import os
 from pathlib import Path
 import tempfile
@@ -29,13 +29,11 @@ class AccelerateDiskSaver(BaseSaveHandler):
         self,
         dirname: Union[str, os.PathLike],
         accelerator: Accelerator,
-        to_unwrap: Optional[Sequence[str]] = None,
         atomic: bool = True,
         **kwargs,
     ):
         self.dirname = Path(dirname).expanduser()
         self.accelerator = accelerator
-        self.to_unwrap = to_unwrap
         self.atomic = atomic
         self.kwargs = kwargs
 
@@ -48,17 +46,8 @@ class AccelerateDiskSaver(BaseSaveHandler):
         filename: str,
         metadata: Optional[Mapping] = None,
     ) -> None:
-        to_unwrap = self.to_unwrap if self.to_unwrap else []
-        unwrapped_checkpoint = {}
-        for key in checkpoint:
-            unwrapped_checkpoint[key] = (
-                self.accelerator.unwrap_model(checkpoint[key])
-                if key in to_unwrap
-                else checkpoint[key]
-            )
-
         path = self.dirname / filename
-        self._save_func(unwrapped_checkpoint, path, self.accelerator.save)
+        self._save_func(checkpoint, path, self.accelerator.save)
 
     def _save_func(
         self, checkpoint: Mapping, path: Path, func: Callable

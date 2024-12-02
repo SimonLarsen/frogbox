@@ -148,6 +148,14 @@ class SupervisedPipeline(Pipeline):
             max_iterations=max_iterations,
         )
 
+        # Load model weights before potential compilation
+        if checkpoint:
+            self._load_checkpoint(
+                path=checkpoint,
+                to_load={"model": self.model},
+                keys=checkpoint_keys,
+            )
+
         # Wrap with accelerator
         self.model, self.optimizer, self.lr_scheduler = (
             self.accelerator.prepare(
@@ -195,14 +203,13 @@ class SupervisedPipeline(Pipeline):
         )
 
         # Set up checkpoints
-        to_save = {
-            "model": self.model,
-            "optimizer": self.optimizer,
-            "trainer": self.trainer,
-            "lr_scheduler": self.lr_scheduler,
-        }
         self._setup_checkpoints(
-            to_save=to_save,
+            to_save={
+                "model": self.model,
+                "optimizer": self.optimizer,
+                "trainer": self.trainer,
+                "lr_scheduler": self.lr_scheduler,
+            },
             checkpoint_dir=checkpoint_dir,
             to_unwrap=["model"],
         )
@@ -211,7 +218,11 @@ class SupervisedPipeline(Pipeline):
         if checkpoint:
             self._load_checkpoint(
                 path=checkpoint,
-                to_load=to_save,
+                to_load={
+                    "optimizer": self.optimizer,
+                    "trainer": self.trainer,
+                    "lr_scheduler": self.lr_scheduler,
+                },
                 keys=checkpoint_keys,
             )
 
