@@ -2,7 +2,7 @@
 .. include:: ./intro.md
 """
 
-__version__ = "0.3.3"
+__version__ = "0.4.0.dev1"
 
 from .pipelines.supervised import SupervisedPipeline  # noqa: F401
 from .pipelines.gan import GANPipeline  # noqa: F401
