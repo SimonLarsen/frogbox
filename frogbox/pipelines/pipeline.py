@@ -169,7 +169,7 @@ class Pipeline(ABC):
     ) -> None:
         if keys is None:
             keys = list(to_load.keys())
-        to_load = {k: to_load[k] for k in keys}
+        to_load = {k: to_load[k] for k in keys if k in to_load}
 
         Checkpoint.load_objects(
             to_load=to_load,
