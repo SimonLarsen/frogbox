@@ -1,27 +1,18 @@
-from typing import Union, Dict, Sequence, Any, Optional
+from typing import Dict, Any, Optional, Union, Sequence
 from os import PathLike
-import warnings
 from enum import Enum
 from pathlib import Path
-from importlib import import_module
 import json
+from pydantic import BaseModel, Field
 import jinja2
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from ignite.engine import Events, CallableEventWithFilter
+from importlib import import_module
+from .engines.events import EventStep, Event, MatchableEvent
 
 
 class ConfigType(str, Enum):
+    """Pipeline configuration type."""
+
     SUPERVISED = "supervised"
-    GAN = "gan"
-
-
-class CheckpointMode(str, Enum):
-    """
-    Checkpoint evaluation mode.
-    """
-
-    MIN = "min"
-    MAX = "max"
 
 
 class LogInterval(BaseModel):
@@ -34,10 +25,46 @@ class LogInterval(BaseModel):
         Event trigger.
     interval : int
         How often event should trigger. Defaults to every time (`1`).
+    first : int
+        First step where event should trigger (zero-indexed).
+    last : int
+        Last step where vent should trigger (zero-indexed).
     """
 
-    event: Events
+    event: EventStep
     every: int = 1
+    first: Optional[int] = None
+    last: Optional[int] = None
+
+
+class CheckpointMode(str, Enum):
+    """Checkpoint evaluation mode."""
+
+    MIN = "min"
+    MAX = "max"
+
+
+class CheckpointDefinition(BaseModel):
+    """
+    Checkpoint definition.
+
+
+    Attributes
+    ----------
+    metric : str
+        Name of metric to compare (optional).
+    mode : CheckpointMode
+        Whether to priority maximum or minimum metric value.
+    num_saved : int
+        Number of checkpoints to save.
+    interval : EventStep or LogInterval
+        Interval between saving checkpoints.
+    """
+
+    metric: Optional[str] = None
+    mode: CheckpointMode = CheckpointMode.MAX
+    num_saved: int = Field(3, ge=1)
+    interval: Union[EventStep, LogInterval] = EventStep.EPOCH_COMPLETED
 
 
 class ObjectDefinition(BaseModel):
@@ -105,14 +132,6 @@ class LRSchedulerDefinition(BaseModel):
     warmup_steps: int = Field(0, ge=0)
 
 
-class CheckpointDefinition(BaseModel):
-    """Checkpoint definition."""
-    metric: Optional[str] = None
-    mode: CheckpointMode = CheckpointMode.MAX
-    n_saved: int = Field(3, ge=1)
-    interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
-
-
 class Config(BaseModel):
     """
     Base configuration.
@@ -123,34 +142,18 @@ class Config(BaseModel):
         Pipeline type.
     project : str
         Project name.
-    checkpoint_metric : str
-        Name of metric to use for evaluating checkpoints.
-    checkpoint_mode : CheckpointMode
-        Either `min` or `max`. Determines whether to keep the checkpoints
-        with the greatest or lowest metric score.
-    checkpoint_n_saved : int
-        Number of checkpoints to keep.
-    log_interval : Events or LogInterval
+    log_interval : EventStep or LogInterval
         At which interval to log metrics.
     """
 
-    model_config = ConfigDict(extra="allow")
-
     type: ConfigType
     project: str
-    log_interval: Union[Events, LogInterval] = Events.EPOCH_COMPLETED
-    checkpoints: Sequence[CheckpointDefinition] = (
-        CheckpointDefinition(
-            metric=None,
-            n_saved=3,
-            interval=Events.EPOCH_COMPLETED,
-        ),
-    )
+    log_interval: Union[EventStep, LogInterval] = EventStep.EPOCH_COMPLETED
 
 
 class SupervisedConfig(Config):
     """
-    Trainer configuration.
+    Supervised pipeline configuration.
 
     Attributes
     ----------
@@ -185,42 +188,27 @@ class SupervisedConfig(Config):
 
     batch_size: int = Field(32, ge=1)
     loader_workers: int = Field(0, ge=0)
-    max_epochs: int = Field(32, ge=1)
+    max_epochs: int = Field(50, ge=1)
     clip_grad_norm: Optional[float] = None
     clip_grad_value: Optional[float] = None
     gradient_accumulation_steps: int = Field(1, ge=1)
-    datasets: Dict[str, ObjectDefinition]
-    loaders: Dict[str, ObjectDefinition] = dict()
+    metrics: Dict[str, ObjectDefinition] = dict()
+    checkpoints: Sequence[CheckpointDefinition] = (
+        CheckpointDefinition(
+            metric=None,
+            num_saved=3,
+            interval=EventStep.EPOCH_COMPLETED,
+        )
+    ),
     model: ObjectDefinition
     losses: Dict[str, LossDefinition] = dict()
-    metrics: Dict[str, ObjectDefinition] = dict()
+    datasets: Dict[str, ObjectDefinition]
+    loaders: Dict[str, ObjectDefinition] = dict()
     optimizer: ObjectDefinition = ObjectDefinition(
-        class_name="torch.optim.AdamW"
+        class_name="torch.optim.AdamW",
+        params={"lr": 1e-3},
     )
     lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
-
-    @field_validator("datasets")
-    @classmethod
-    def validate_datasets(cls, v):
-        assert "train" in v, "'train' missing in datasets definition."
-        assert "val" in v, "'val' missing in datasets definition."
-        return v
-
-    @field_validator("losses")
-    @classmethod
-    def validate_losses(cls, v):
-        if len(v) == 0:
-            warnings.warn("No loss functions defined.")
-        return v
-
-
-class GANConfig(SupervisedConfig):
-    disc_model: ObjectDefinition
-    disc_losses: Dict[str, LossDefinition] = dict()
-    disc_optimizer: ObjectDefinition = ObjectDefinition(
-        class_name="torch.optim.AdamW"
-    )
-    disc_lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
 
 
 def read_json_config(path: Union[str, PathLike]) -> Config:
@@ -239,27 +227,24 @@ def read_json_config(path: Union[str, PathLike]) -> Config:
     assert "type" in config
     if config["type"] == "supervised":
         return SupervisedConfig.model_validate(config)
-    elif config["type"] == "gan":
-        return GANConfig.model_validate(config)
     else:
         raise RuntimeError(f"Unknown config type {config['type']}.")
 
 
-def parse_log_interval(
-    e: Union[Events, LogInterval]
-) -> CallableEventWithFilter:
-    """
-    Create ignite event from string or dictionary configuration.
-    Dictionary must have a ``event`` entry.
-    """
-    if isinstance(e, Events):
-        return e
+def parse_log_interval(e: Union[str, LogInterval]) -> MatchableEvent:
+    """Create matchable event from log interval configuration."""
+    if isinstance(e, str):
+        return Event(event=e)
 
-    config = dict(e)
-    event = config.pop("event")
-    if len(config) > 0:
-        event = event(**config)
-    return event
+    if isinstance(e, LogInterval):
+        return Event(
+            event=e.event,
+            every=e.every,
+            first=e.first,
+            last=e.last,
+        )
+
+    raise ValueError(f"Cannot parse log interval {e}.")
 
 
 def _get_class(path: str) -> Any:

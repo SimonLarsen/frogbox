@@ -1,32 +1,5 @@
-from typing import Dict, Union
 import torch
-from ..config import (
-    LossDefinition,
-    SchedulerType,
-    LRSchedulerDefinition,
-    create_object_from_config,
-)
-from .composite_loss import CompositeLoss
-
-
-def create_composite_loss(
-    config: Dict[str, LossDefinition],
-    device: Union[str, torch.device],
-) -> CompositeLoss:
-    loss_labels = []
-    loss_modules = []
-    loss_weights = []
-    for loss_label, loss_conf in config.items():
-        loss_labels.append(loss_label)
-        loss_modules.append(create_object_from_config(loss_conf))
-        loss_weights.append(loss_conf.weight)
-
-    loss_fn = CompositeLoss(
-        labels=loss_labels,
-        losses=loss_modules,
-        weights=loss_weights,
-    ).to(torch.device(device))
-    return loss_fn
+from ..config import LRSchedulerDefinition, SchedulerType
 
 
 def create_lr_scheduler(
