@@ -33,7 +33,7 @@ class ResidualBlock(nn.Module):
         return x + identity
 
 
-class ExampleModel(nn.Module):
+class Upscaler(nn.Module):
     def __init__(
         self,
         scale_factor: int = 2,

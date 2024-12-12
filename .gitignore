@@ -168,3 +168,6 @@ venv
 examples/supervised/data
 examples/supervised/checkpoints
 examples/supervised/wandb
+examples/gan/data
+examples/gan/checkpoints
+examples/gan/wandb

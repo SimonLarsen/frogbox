@@ -3,7 +3,7 @@ from os import PathLike
 from enum import Enum
 from pathlib import Path
 import json
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import jinja2
 from importlib import import_module
 from .engines.events import EventStep, Event, MatchableEvent
@@ -13,6 +13,7 @@ class ConfigType(str, Enum):
     """Pipeline configuration type."""
 
     SUPERVISED = "supervised"
+    GAN = "gan"
 
 
 class LogInterval(BaseModel):
@@ -175,7 +176,7 @@ class SupervisedConfig(Config):
     loaders : dict of ObjectDefinition
         Data loader definitions.
     model : ObjectDefinition
-        Model object definition.
+        Model definition.
     losses : dict of LossDefinition
         Loss functions.
     metrics : dict of ObjectDefinition
@@ -210,6 +211,42 @@ class SupervisedConfig(Config):
     )
     lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
 
+    @field_validator("type")
+    @classmethod
+    def check_type(cls, v: ConfigType) -> ConfigType:
+        assert v == ConfigType.SUPERVISED
+        return v
+
+
+class GANConfig(SupervisedConfig):
+    """
+    GAN pipeline configuration.
+
+    Attributes
+    ----------
+    disc_model : ObjectDefinition
+        Discriminator model definition.
+    disc_losses: dict of LossDefinition
+        Discriminator loss functions.
+    disc_optimizer : ObjectDefinition
+        Discriminator Torch optimizer.
+    disc_lr_scheduler : LRSchedulerDefinition
+        Discriminator learning rate scheduler.
+    """
+    disc_model: ObjectDefinition
+    disc_losses: Dict[str, LossDefinition] = dict()
+    disc_optimizer: ObjectDefinition = ObjectDefinition(
+        class_name="torch.optim.AdamW",
+        params={"lr": 1e-3},
+    )
+    disc_lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
+
+    @field_validator("type")
+    @classmethod
+    def check_type(cls, v: ConfigType) -> ConfigType:
+        assert v == ConfigType.GAN
+        return v
+
 
 def read_json_config(path: Union[str, PathLike]) -> Config:
     """
@@ -227,6 +264,8 @@ def read_json_config(path: Union[str, PathLike]) -> Config:
     assert "type" in config
     if config["type"] == "supervised":
         return SupervisedConfig.model_validate(config)
+    elif config["type"] == "gan":
+        return GANConfig.model_validate(config)
     else:
         raise RuntimeError(f"Unknown config type {config['type']}.")
 

@@ -39,14 +39,14 @@ class SupervisedTrainer(Engine):
     def process(self, batch):
         self.model.train()
 
+        inputs, targets = batch
+        inputs, targets = self._input_transform(inputs, targets)
+
         with self.accelerator.accumulate(self.model):
             self.optimizer.zero_grad()
-            inputs, targets = batch
-            inputs, targets = self._input_transform(inputs, targets)
+            outputs = self._model_transform(self.model(inputs))
 
-            output = self._model_transform(self.model(inputs))
-
-            loss = self.loss_fn(output, targets)
+            loss = self.loss_fn(outputs, targets)
             self.accelerator.backward(loss)
 
             if self.accelerator.sync_gradients:
@@ -64,7 +64,7 @@ class SupervisedTrainer(Engine):
             self.optimizer.step()
             self.scheduler.step()
 
-        return self._output_transform(inputs, targets, output, loss)
+        return self._output_transform(inputs, targets, outputs, loss)
 
 
 class SupervisedEvaluator(Engine):

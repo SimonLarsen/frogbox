@@ -5,6 +5,7 @@ from .config import (
     read_json_config,
     Config,
     SupervisedConfig,
+    GANConfig,
     create_object_from_config,
 )
 import torch
@@ -38,6 +39,11 @@ def load_model_checkpoint(
 
     if base_config.type == "supervised":
         config = cast(SupervisedConfig, base_config)
+        model = create_object_from_config(config.model)
+        model.load_state_dict(ckpt["model"])
+        return model, config
+    elif base_config.type == "gan":
+        config = cast(GANConfig, base_config)
         model = create_object_from_config(config.model)
         model.load_state_dict(ckpt["model"])
         return model, config

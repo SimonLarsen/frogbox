@@ -1,0 +1,32 @@
+{
+    "train": {
+        "class_name": "datasets.example.ExampleDataset",
+        "params": {
+            "split": "train",
+            "do_normalize": true,
+            "do_augment": true,
+            "normalize_mean": [0.5, 0.5, 0.5],
+            "normalize_std": [0.5, 0.5, 0.5]
+        }
+    },
+    "val": {
+        "class_name": "datasets.example.ExampleDataset",
+        "params": {
+            "split": "val",
+            "do_normalize": true,
+            "do_augment": false,
+            "normalize_mean": [0.5, 0.5, 0.5],
+            "normalize_std": [0.5, 0.5, 0.5]
+        }
+    },
+    "test": {
+        "class_name": "datasets.example.ExampleDataset",
+        "params": {
+            "split": "test",
+            "do_normalize": true,
+            "do_augment": false,
+            "normalize_mean": [0.5, 0.5, 0.5],
+            "normalize_std": [0.5, 0.5, 0.5]
+        }
+    }
+}

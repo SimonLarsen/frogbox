@@ -1,7 +1,7 @@
 from typing import cast, Optional, Sequence
 from pathlib import Path
 import argparse
-from frogbox import read_json_config, SupervisedPipeline, SupervisedConfig
+from frogbox import read_json_config, GANPipeline, GANConfig
 from frogbox.callbacks import ImageLogger
 
 
@@ -28,9 +28,9 @@ def parse_arguments(
 
 if __name__ == "__main__":
     args = parse_arguments()
-    config = cast(SupervisedConfig, read_json_config(args.config))
+    config = cast(GANConfig, read_json_config(args.config))
 
-    pipeline = SupervisedPipeline(
+    pipeline = GANPipeline(
         config=config,
         checkpoint=args.checkpoint,
         checkpoint_keys=args.checkpoint_keys,
