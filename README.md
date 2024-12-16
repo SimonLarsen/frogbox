@@ -5,19 +5,20 @@
     frogbox
 </h1>
 
-Frogbox is an opinionated machine learning framework for PyTorch built for rapid prototyping and research.
+Frogbox is an opinionated PyTorch machine learning framework built for rapid prototyping and research.
 
 ## Features
 
-* Built around [Torch Ignite](https://pytorch-ignite.ai) and [Accelerate](https://huggingface.co/docs/accelerate/index) to support automatic mixed precision (AMP) and distributed training.
 * Experiments are defined using JSON files and support [jinja2](https://jinja.palletsprojects.com) templates.
+* Flexible event system inspired by [Ignite](https://pytorch.org/ignite).
 * Automatic experiment tracking. Currently only [Weights & Biases](https://wandb.ai/) is supported with other platforms planned.
 * CLI tool for easy project management. Just type `frogbox project new -t supervised` to get started.
+* Integrates [Accelerate](https://huggingface.co/docs/accelerate/index) to support automatic mixed precision (AMP) and distributed training.
 
 ## Installation
 
 ```sh
-pip install git+https://SimonLarsen@github.com/SimonLarsen/frogbox.git@v0.3.3
+pip install git+https://SimonLarsen@github.com/SimonLarsen/frogbox.git@v0.5.0
 ```
 
 ## Getting started

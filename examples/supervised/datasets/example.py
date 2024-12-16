@@ -65,13 +65,13 @@ class ExampleDataset(Dataset):
         image, _ = self.data[idx]
         image = pil_to_tensor(image) / 255
 
-        X = resize(image, size=16, antialias=True)
+        x = resize(image, size=16, antialias=True)
         y = image
 
         if self.do_augment:
-            X = self.augment(X)
+            x = self.augment(x)
 
         if self.do_normalize:
-            X = self.normalize(X)
+            x = self.normalize(x)
 
-        return X, y
+        return x, y

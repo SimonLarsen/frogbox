@@ -1,17 +1,12 @@
 from torch import nn
 from torch.nn.utils import spectral_norm
-from .blocks import get_activation
 
 
 class SNResidualBlock(nn.Module):
-    def __init__(
-        self,
-        channels: int,
-        activation: str = "relu",
-    ):
+    def __init__(self, channels: int):
         super().__init__()
 
-        self.act = get_activation(activation)
+        self.act = nn.GELU()
         self.conv1 = spectral_norm(
             nn.Conv2d(channels, channels, 3, 1, 1, bias=False)
         )
@@ -37,7 +32,6 @@ class Discriminator(nn.Module):
         in_channels: int = 3,
         hidden_channels: int = 32,
         num_blocks: int = 8,
-        activation: str = "silu",
     ):
         super().__init__()
 
@@ -45,7 +39,7 @@ class Discriminator(nn.Module):
 
         blocks = []
         for _ in range(num_blocks):
-            blocks.append(SNResidualBlock(hidden_channels, activation))
+            blocks.append(SNResidualBlock(hidden_channels))
         self.blocks = nn.Sequential(*blocks)
 
         self.conv_out = nn.Conv2d(hidden_channels, 1, 3, 1, 1)

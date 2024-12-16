@@ -1,8 +1,8 @@
-from typing import Optional, Sequence
+from typing import cast, Optional, Sequence
 from pathlib import Path
 import argparse
-from frogbox import read_json_config, GANPipeline, Events
-from frogbox.callbacks import create_image_logger
+from frogbox import read_json_config, GANPipeline, GANConfig
+from frogbox.callbacks import ImageLogger
 
 
 def parse_arguments(
@@ -28,7 +28,7 @@ def parse_arguments(
 
 if __name__ == "__main__":
     args = parse_arguments()
-    config = read_json_config(args.config)
+    config = cast(GANConfig, read_json_config(args.config))
 
     pipeline = GANPipeline(
         config=config,
@@ -40,16 +40,12 @@ if __name__ == "__main__":
         group=args.group,
     )
 
-    dataset_params = config.datasets["test"].params
-    image_logger = create_image_logger(
-        split="test",
-        normalize_mean=dataset_params["normalize_mean"],
-        normalize_std=dataset_params["normalize_std"],
-        denormalize_input=dataset_params["do_normalize"],
+    ds_conf = config.datasets["train"].params
+    image_logger = ImageLogger(
+        denormalize_input=True,
+        normalize_mean=ds_conf["normalize_mean"],
+        normalize_std=ds_conf["normalize_std"],
     )
-    pipeline.install_callback(
-        event=Events.EPOCH_COMPLETED,
-        callback=image_logger,
-    )
+    pipeline.install_callback(pipeline.log_interval, image_logger)
 
     pipeline.run()

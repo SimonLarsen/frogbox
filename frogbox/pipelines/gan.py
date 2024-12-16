@@ -4,8 +4,8 @@
 The GAN pipeline is similar to the supervised pipelines, except that it adds
 another model, the discriminator, with its own loss function(s).
 
-The discriminator model is configured in the `disc_model ` similarly to the
-(generator) model:
+The discriminator model is configured in the `disc_model` field similarly
+to the (generator) model:
 
 ```json
 {
@@ -28,8 +28,9 @@ The `GANPipeline` requires two different loss functions: `losses` defines the
 loss function for the generator and `disc_losses` defines the loss function for
 the disciminator.
 
-The discriminator loss takes two optional arguments, `disc_real` and
-`disc_fake`, and the generator loss takes one optional argument, `disc_fake`.
+The discriminator loss takes two keyword arguments, `disc_real` and
+`disc_fake`.
+The generator loss takes one optional argument, `disc_fake`.
 These tensors contain the predictions from the discriminator model
 when passed the batch of real and fake data, respectively.
 
@@ -56,53 +57,34 @@ class DiscriminatorLoss(torch.nn.Module):
         loss_fake = self.loss_fn(disc_fake, torch.zeros_like(disc_fake))
         return loss_real + loss_fake
 ```
-
-## Updating models at different intervals
-
-It is possible to update the generator and disciminator models at different
-intervals using the `update_interval` and `disc_update_interval` fields.
-For instance, in order to update the discriminator only every five iterations:
-
-```json
-{
-    "type": "gan",
-    "update_interval": 1,
-    "disc_update_interval": 5,
-    ...
-}
-```
 """
 
-from typing import Any, Dict, Callable, Union, Optional, Sequence
+
+from typing import Dict, Optional, Union, Sequence, Callable, Any
 from os import PathLike
-from pathlib import Path
+from functools import partial
 import torch
 from torch.utils.data import Dataset, DataLoader
-from ignite.engine import Events, CallableEventWithFilter
-from ignite.handlers import global_step_from_engine
-from ignite.contrib.handlers import ProgressBar
 from accelerate import Accelerator
+from torchmetrics import Metric
 from .pipeline import Pipeline
-from .common import (
-    create_composite_loss,
-    create_lr_scheduler,
-)
-from ..config import (
-    GANConfig,
-    create_object_from_config,
-    parse_log_interval,
-)
-from ..engines.supervised import create_supervised_evaluator
-from ..engines.gan import create_gan_trainer
+from ..config import GANConfig, create_object_from_config, parse_log_interval
+from ..engines.gan import GANTrainer
+from ..engines.supervised import SupervisedEvaluator
+from .lr_scheduler import create_lr_scheduler
 from .composite_loss import CompositeLoss
-from .logger import AccelerateLogger
+from ..handlers.output_logger import OutputLogger
+from ..handlers.metric_logger import MetricLogger
+from ..handlers.composite_loss_logger import CompositeLossLogger
+from ..handlers.checkpoint import Checkpoint
 
 
 class GANPipeline(Pipeline):
     """GAN pipeline."""
 
     config: GANConfig
-    log_interval: CallableEventWithFilter
+    trainer: GANTrainer
+    evaluator: SupervisedEvaluator
     datasets: Dict[str, Dataset]
     loaders: Dict[str, DataLoader]
     model: torch.nn.Module
@@ -113,13 +95,13 @@ class GANPipeline(Pipeline):
     disc_lr_scheduler: torch.optim.lr_scheduler.LRScheduler
     loss_fn: CompositeLoss
     disc_loss_fn: CompositeLoss
+    metrics: Dict[str, Metric]
 
     def __init__(
         self,
         config: GANConfig,
         checkpoint: Optional[Union[str, PathLike]] = None,
         checkpoint_keys: Optional[Sequence[str]] = None,
-        checkpoint_dir: Union[str, PathLike] = Path("checkpoints"),
         logging: str = "online",
         wandb_id: Optional[str] = None,
         tags: Optional[Sequence[str]] = None,
@@ -133,7 +115,7 @@ class GANPipeline(Pipeline):
             [Any], Any
         ] = lambda output: output,
         trainer_output_transform: Callable[
-            [Any, Any, Any, torch.Tensor, torch.Tensor], Any
+            [Any, Any, Any, Any, Any], Any
         ] = lambda x, y, y_pred, loss, disc_loss: (
             loss.item(),
             disc_loss.item(),
@@ -151,65 +133,24 @@ class GANPipeline(Pipeline):
     ):
         """
         Create GAN pipeline.
-
-        Parameters
-        ----------
-        config : GANConfig
-            Pipeline configuration.
-        checkpoint : path-like
-            Path to experiment checkpoint.
-        checkpoint_keys : list of str
-            List of keys for objects to load from checkpoint.
-            Defaults to all keys.
-        checkpoint_dir : str or path
-            Path to directory to store checkpoints.
-        logging : str
-            Logging mode. Must be either "online" or "offline".
-        wandb_id : str
-            W&B run ID to resume from.
-        tags : list of str
-            List of tags to add to the run in W&B.
-        group : str
-            Group to add run to in W&B.
-        trainer_input_transform : Callable
-            Function that receives tensors `x` and `y` and outputs tuple of
-            tensors `(x, y)`.
-        trainer_model_transform : Callable
-            Function that receives the output from the model during training
-            and converts it into the form as required by the loss function.
-        trainer_disc_model_transform : Callable
-            Function that receives the output from the discriminator
-            during training and converts it into the form as required
-            by the loss function.
-        trainer_output_transform : Callable
-            Function that receives `x`, `y`, `y_pred`, `loss` and returns value
-            to be assigned to trainer's `state.output` after each iteration.
-            Default is returning `loss.item()`.
-        evaluator_input_transform : Callable
-            Function that receives tensors `x` and `y` and outputs tuple of
-            tensors `(x, y)`.
-        evaluator_model_transform : Callable
-            Function that receives the output from the model during evaluation
-            and converts it into the predictions:
-            `y_pred = model_transform(model(x))`.
-        evaluator_output_transform : Callable
-            Function that receives `x`, `y`, `y_pred` and returns value to be
-            assigned to evaluator's `state.output` after each iteration.
-            Default is returning `(y_pred, y)` which fits output expected by
-            metrics.
         """
-        logging = logging.lower()
-        assert logging in ("online", "offline")
 
         # Parse config
+        logging = logging.lower()
+        assert logging in ("online", "offline")
         self.config = config
-        self.log_interval = parse_log_interval(config.log_interval)
-        self._generate_name()
 
         # Create accelerator
         self.accelerator = Accelerator(
             gradient_accumulation_steps=config.gradient_accumulation_steps,
             log_with="wandb",
+        )
+
+        self._setup_tracking(
+            mode=logging,
+            wandb_id=wandb_id,
+            tags=tags,
+            group=group,
         )
 
         # Create datasets and data loaders
@@ -220,13 +161,14 @@ class GANPipeline(Pipeline):
             loaders=config.loaders,
         )
 
-        # Create models
+        # Create model
         self.model = create_object_from_config(config.model)
         self.optimizer = create_object_from_config(
             config=config.optimizer,
             params=self.model.parameters(),
         )
 
+        # Create discriminator model
         self.disc_model = create_object_from_config(config.disc_model)
         self.disc_optimizer = create_object_from_config(
             config=config.disc_optimizer,
@@ -246,14 +188,6 @@ class GANPipeline(Pipeline):
             max_iterations=max_iterations,
         )
 
-        # Load model weights before potential compilation
-        if checkpoint:
-            self._load_checkpoint(
-                path=checkpoint,
-                to_load={"model": self.model, "disc_model": self.disc_model},
-                keys=checkpoint_keys,
-            )
-
         # Wrap with accelerator
         self.model, self.optimizer, self.lr_scheduler = (
             self.accelerator.prepare(
@@ -268,140 +202,120 @@ class GANPipeline(Pipeline):
         for split in self.loaders.keys():
             self.loaders[split] = self.accelerator.prepare(self.loaders[split])
 
-        # Create trainer
-        self.loss_fn = create_composite_loss(
-            config.losses, self.accelerator.device
-        )
-        self.disc_loss_fn = create_composite_loss(
-            config.disc_losses, self.accelerator.device
-        )
-        self.trainer = create_gan_trainer(
+        self.loss_fn = self._create_composite_loss(config.losses)
+        self.disc_loss_fn = self._create_composite_loss(config.disc_losses)
+        self.trainer = GANTrainer(
             accelerator=self.accelerator,
             model=self.model,
             disc_model=self.disc_model,
+            loss_fn=self.loss_fn,
+            disc_loss_fn=self.disc_loss_fn,
             optimizer=self.optimizer,
             disc_optimizer=self.disc_optimizer,
             scheduler=self.lr_scheduler,
             disc_scheduler=self.disc_lr_scheduler,
-            loss_fn=self.loss_fn,
-            disc_loss_fn=self.disc_loss_fn,
             clip_grad_norm=config.clip_grad_norm,
             clip_grad_value=config.clip_grad_value,
             input_transform=trainer_input_transform,
             model_transform=trainer_model_transform,
             disc_model_transform=trainer_disc_model_transform,
             output_transform=trainer_output_transform,
+            progress_label="train",
+        )
+
+        OutputLogger("train/loss", self.log, lambda o: o[0]).attach(
+            self.trainer
+        )
+        OutputLogger("train/disc_loss", self.log, lambda o: o[1]).attach(
+            self.trainer
+        )
+        CompositeLossLogger(self.loss_fn, self.log, "loss/").attach(
+            self.trainer
+        )
+        CompositeLossLogger(self.disc_loss_fn, self.log, "disc_loss/").attach(
+            self.trainer
         )
 
         # Create evaluator
-        metrics = {}
-        for metric_label, metric_conf in config.metrics.items():
-            metrics[metric_label] = create_object_from_config(metric_conf)
-
-        self.evaluator = create_supervised_evaluator(
+        self.evaluator = SupervisedEvaluator(
             accelerator=self.accelerator,
             model=self.model,
-            metrics=metrics,
             input_transform=evaluator_input_transform,
             model_transform=evaluator_model_transform,
             output_transform=evaluator_output_transform,
+            progress_label="val",
         )
-
         self.trainer.add_event_handler(
-            event_name=self.log_interval,
-            handler=lambda: self.evaluator.run(self.loaders["val"]),
+            event=self.log_interval,
+            function=lambda: self.evaluator.run(self.loaders["val"]),
         )
 
-        # Set up checkpoints
-        self._setup_checkpoints(
-            to_save={
-                "model": self.model,
-                "disc_model": self.disc_model,
-                "optimizer": self.optimizer,
-                "disc_optimizer": self.disc_optimizer,
-                "trainer": self.trainer,
-                "lr_scheduler": self.lr_scheduler,
-                "disc_lr_scheduler": self.disc_lr_scheduler,
-            },
-            checkpoint_dir=checkpoint_dir,
-            to_unwrap=["model", "disc_model"],
-        )
+        # Set up metric logging
+        self.metrics = {}
+        for metric_label, metric_conf in config.metrics.items():
+            self.metrics[metric_label] = create_object_from_config(
+                config=metric_conf,
+                sync_on_compute=False,
+            ).to(self.device)
 
-        if checkpoint:
+        MetricLogger(
+            metrics=self.metrics,
+            log_function=self.log,
+            prefix="val/",
+        ).attach(self.evaluator)
+
+        # Set up checkpoint handlers
+        to_save = {
+            "trainer": self.trainer,
+            "model": self.model,
+            "disc_model": self.disc_model,
+            "optimizer": self.optimizer,
+            "disc_optimizer": self.disc_optimizer,
+            "scheduler": self.lr_scheduler,
+            "disc_scheduler": self.disc_lr_scheduler,
+        }
+        to_unwrap = ["model", "disc_model"]
+        output_folder = f"checkpoints/{self.run_name}"
+
+        for ckpt_def in config.checkpoints:
+            score_function = None
+            if ckpt_def.metric is not None:
+                score_function = partial(
+                    lambda metric: metric.compute().item(),
+                    metric=self.metrics[ckpt_def.metric],
+                )
+
+            checkpoint_handler = Checkpoint(
+                accelerator=self.accelerator,
+                config=self.config,
+                to_save=to_save,
+                output_folder=output_folder,
+                global_step_function=lambda: self.trainer.iteration,
+                score_function=score_function,
+                score_name=ckpt_def.metric,
+                score_mode=ckpt_def.mode,
+                to_unwrap=to_unwrap,
+                max_saved=ckpt_def.num_saved,
+            )
+            self.trainer.add_event_handler(
+                event=parse_log_interval(ckpt_def.interval),
+                function=checkpoint_handler,
+            )
+
+        # Load checkpoint
+        if checkpoint is not None:
             self._load_checkpoint(
                 path=checkpoint,
-                to_load={
-                    "optimizer": self.optimizer,
-                    "disc_optimizer": self.disc_optimizer,
-                    "trainer": self.trainer,
-                    "lr_scheduler": self.lr_scheduler,
-                    "disc_lr_scheduler": self.disc_lr_scheduler,
-                },
+                to_load=to_save,
+                to_unwrap=to_unwrap,
                 keys=checkpoint_keys,
             )
 
-        # Set up logging
-        self._setup_tracking(
-            mode=logging,
-            wandb_id=wandb_id,
-            tags=tags,
-            group=group,
-        )
-
-        if self.accelerator.is_main_process:
-            ProgressBar(desc="Train", ncols=80).attach(self.trainer)
-            ProgressBar(desc="Val", ncols=80).attach(self.evaluator)
-
-            def log_losses():
-                fns = (self.loss_fn, self.disc_loss_fn)
-                prefixes = ("loss", "disc_loss")
-                for prefix, fn in zip(prefixes, fns):
-                    labels = [f"{prefix}/{label}" for label in fn.labels]
-                    losses = dict(zip(labels, fn.last_values))
-                    self.log(losses)
-
-            self.trainer.add_event_handler(
-                Events.ITERATION_COMPLETED, log_losses
-            )
-
-            self.logger = AccelerateLogger(self.accelerator)
-            self.logger.attach_output_handler(
-                engine=self.trainer,
-                event_name=Events.ITERATION_COMPLETED,
-                tag="train",
-                output_transform=lambda losses: {
-                    "loss": losses[0],
-                    "disc_loss": losses[1],
-                },
-            )
-            self.logger.attach_opt_params_handler(
-                engine=self.trainer,
-                event_name=Events.ITERATION_COMPLETED,
-                optimizer=self.optimizer,
-                tag="optimizer",
-                param_name="lr",
-            )
-            self.logger.attach_opt_params_handler(
-                engine=self.trainer,
-                event_name=Events.ITERATION_COMPLETED,
-                optimizer=self.disc_optimizer,
-                tag="disc_optimizer",
-                param_name="lr",
-            )
-            self.logger.attach_output_handler(
-                engine=self.evaluator,
-                event_name=Events.COMPLETED,
-                tag="val",
-                metric_names="all",
-                global_step_transform=global_step_from_engine(
-                    self.trainer, Events.ITERATION_COMPLETED
-                ),
-            )
-
     def run(self) -> None:
+        """Run pipeline."""
         try:
             self.trainer.run(
-                data=self.loaders["train"],
+                loader=self.loaders["train"],
                 max_epochs=self.config.max_epochs,
             )
         except KeyboardInterrupt:

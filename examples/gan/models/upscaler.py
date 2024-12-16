@@ -1,6 +1,36 @@
 import math
 from torch import nn
-from .blocks import get_activation, ResidualBlock
+
+
+class ResidualBlock(nn.Module):
+    def __init__(
+        self,
+        channels: int,
+        norm_groups: int = 4,
+        norm_eps: float = 1e-5,
+    ):
+        super().__init__()
+
+        self.act = nn.GELU()
+
+        self.norm1 = nn.GroupNorm(norm_groups, channels, norm_eps)
+        self.conv1 = nn.Conv2d(channels, channels, 3, 1, 1)
+
+        self.norm2 = nn.GroupNorm(norm_groups, channels, norm_eps)
+        self.conv2 = nn.Conv2d(channels, channels, 3, 1, 1)
+
+    def forward(self, x):
+        identity = x
+
+        x = self.norm1(x)
+        x = self.act(x)
+        x = self.conv1(x)
+
+        x = self.norm2(x)
+        x = self.act(x)
+        x = self.conv2(x)
+
+        return x + identity
 
 
 class Upscaler(nn.Module):
@@ -12,23 +42,19 @@ class Upscaler(nn.Module):
         hidden_channels: int = 32,
         num_layers: int = 4,
         norm_groups: int = 4,
-        activation: str = "gelu",
     ):
         super().__init__()
 
         self.conv_in = nn.Conv2d(in_channels, hidden_channels, 3, 1, 1)
 
-        features = []
+        self.blocks = nn.ModuleList()
         for _ in range(num_layers):
-            features.append(
+            self.blocks.append(
                 ResidualBlock(
                     channels=hidden_channels,
                     norm_groups=norm_groups,
-                    activation=activation,
                 )
             )
-        features.append(nn.Conv2d(hidden_channels, hidden_channels, 3, 1, 1))
-        self.features = nn.Sequential(*features)
 
         upsample = []
         for _ in range(int(math.log2(scale_factor))):
@@ -36,18 +62,21 @@ class Upscaler(nn.Module):
             upsample.append(
                 nn.Conv2d(hidden_channels, hidden_channels, 3, 1, 1)
             )
-            upsample.append(get_activation(activation))
+            upsample.append(nn.GELU())
         self.upsample = nn.Sequential(*upsample)
 
         self.conv_out = nn.Sequential(
             nn.Conv2d(hidden_channels, hidden_channels, 3, 1, 1),
-            get_activation(activation),
+            nn.GELU(),
             nn.Conv2d(hidden_channels, out_channels, 3, 1, 1),
         )
 
     def forward(self, x):
-        x = self.conv_in(x)
-        x = self.features(x)
-        x = self.upsample(x)
-        x = self.conv_out(x)
-        return x
+        h = self.conv_in(x)
+        for block in self.blocks:
+            h = block(h) + h
+        h = self.upsample(h)
+        h = self.conv_out(h)
+
+        x = nn.functional.interpolate(x, h.shape[-2:], mode="bilinear")
+        return nn.functional.sigmoid(x + h)

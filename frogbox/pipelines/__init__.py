@@ -10,4 +10,5 @@ model training pipeline.
 
 The `frogbox.pipelines.gan.GANPipeline` is used for training a generative
 adversarial model.
+
 """

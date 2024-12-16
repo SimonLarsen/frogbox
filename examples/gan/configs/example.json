@@ -1,19 +1,17 @@
 {
     "type": "gan",
     "project": "frogbox-example",
-    "amp": true,
     "batch_size": 32,
     "loader_workers": 4,
     "max_epochs": 16,
+    "log_interval": "epoch_completed",
     "checkpoints": [
         {
             "metric": "PSNR",
             "mode": "max"
         }
     ],
-    "log_interval": "epoch_completed",
     "datasets": {% include 'datasets.json' %},
-    "disc_update_interval": 2,
     "model": {
         "class_name": "models.upscaler.Upscaler",
         "params": {
@@ -30,8 +28,7 @@
         "params": {
             "in_channels": 3,
             "hidden_channels": 32,
-            "num_blocks": 8,
-            "activation": "silu"
+            "num_blocks": 8
         }
     },
     "losses": {
@@ -52,11 +49,11 @@
     },
     "metrics": {
         "SSIM": {
-            "class_name": "ignite.metrics.SSIM",
+            "class_name": "torchmetrics.image.StructuralSimilarityIndexMeasure",
             "params": {"data_range": 1.0}
         },
         "PSNR": {
-            "class_name": "ignite.metrics.PSNR",
+            "class_name": "torchmetrics.image.PeakSignalNoiseRatio",
             "params": {"data_range": 1.0}
         }
     },
