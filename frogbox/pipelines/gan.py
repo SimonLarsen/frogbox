@@ -59,7 +59,6 @@ class DiscriminatorLoss(torch.nn.Module):
 ```
 """
 
-
 from typing import Dict, Optional, Union, Sequence, Callable, Any
 from os import PathLike
 from functools import partial
@@ -75,6 +74,7 @@ from .lr_scheduler import create_lr_scheduler
 from .composite_loss import CompositeLoss
 from ..handlers.output_logger import OutputLogger
 from ..handlers.metric_logger import MetricLogger
+from ..handlers.optimizer_logger import OptimizerLogger
 from ..handlers.composite_loss_logger import CompositeLossLogger
 from ..handlers.checkpoint import Checkpoint
 
@@ -223,18 +223,24 @@ class GANPipeline(Pipeline):
             progress_label="train",
         )
 
-        OutputLogger("train/loss", self.log, lambda o: o[0]).attach(
-            self.trainer
-        )
-        OutputLogger("train/disc_loss", self.log, lambda o: o[1]).attach(
-            self.trainer
-        )
-        CompositeLossLogger(self.loss_fn, self.log, "loss/").attach(
-            self.trainer
-        )
-        CompositeLossLogger(self.disc_loss_fn, self.log, "disc_loss/").attach(
-            self.trainer
-        )
+        OutputLogger(
+            "train/loss", self.log, lambda o: o[0]
+        ).attach(self.trainer)
+        OutputLogger(
+            "train/disc_loss", self.log, lambda o: o[1]
+        ).attach(self.trainer)
+        CompositeLossLogger(
+            self.loss_fn, self.log, "loss/"
+        ).attach(self.trainer)
+        CompositeLossLogger(
+            self.disc_loss_fn, self.log, "disc_loss/"
+        ).attach(self.trainer)
+        OptimizerLogger(
+            self.optimizer, ["lr"], self.log, "optimizer/"
+        ).attach(self.trainer)
+        OptimizerLogger(
+            self.disc_optimizer, ["lr"], self.log, "disc_optimizer/"
+        ).attach(self.trainer)
 
         # Create evaluator
         self.evaluator = SupervisedEvaluator(

@@ -16,6 +16,7 @@ from .lr_scheduler import create_lr_scheduler
 from .composite_loss import CompositeLoss
 from ..handlers.output_logger import OutputLogger
 from ..handlers.metric_logger import MetricLogger
+from ..handlers.optimizer_logger import OptimizerLogger
 from ..handlers.composite_loss_logger import CompositeLossLogger
 from ..handlers.checkpoint import Checkpoint
 
@@ -173,9 +174,12 @@ class SupervisedPipeline(Pipeline):
         )
 
         OutputLogger("train/loss", self.log).attach(self.trainer)
-        CompositeLossLogger(self.loss_fn, self.log, "loss/").attach(
-            self.trainer
-        )
+        CompositeLossLogger(
+            self.loss_fn, self.log, "loss/"
+        ).attach(self.trainer)
+        OptimizerLogger(
+            self.optimizer, ["lr"], self.log, "optimizer/"
+        ).attach(self.trainer)
 
         # Create evaluator
         self.evaluator = SupervisedEvaluator(
