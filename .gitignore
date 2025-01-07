@@ -171,3 +171,9 @@ examples/supervised/wandb
 examples/gan/data
 examples/gan/checkpoints
 examples/gan/wandb
+
+# pdoc output
+docs/frogbox
+docs/frogbox.html
+docs/index.html
+docs/search.js
