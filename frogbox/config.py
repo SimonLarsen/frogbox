@@ -3,10 +3,14 @@ from os import PathLike
 from enum import Enum
 from pathlib import Path
 import json
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 import jinja2
 from importlib import import_module
 from .engines.events import EventStep, Event, MatchableEvent
+
+
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 class ConfigType(str, Enum):
@@ -16,7 +20,7 @@ class ConfigType(str, Enum):
     GAN = "gan"
 
 
-class LogInterval(BaseModel):
+class LogInterval(StrictModel):
     """
     Logging interval.
 
@@ -45,7 +49,7 @@ class CheckpointMode(str, Enum):
     MAX = "max"
 
 
-class CheckpointDefinition(BaseModel):
+class CheckpointDefinition(StrictModel):
     """
     Checkpoint definition.
 
@@ -68,7 +72,7 @@ class CheckpointDefinition(BaseModel):
     interval: Union[EventStep, LogInterval] = EventStep.EPOCH_COMPLETED
 
 
-class ObjectDefinition(BaseModel):
+class ObjectDefinition(StrictModel):
     """
     Object instance definition.
 
@@ -106,7 +110,7 @@ class SchedulerType(str, Enum):
     COSINE = "cosine"
 
 
-class LRSchedulerDefinition(BaseModel):
+class LRSchedulerDefinition(StrictModel):
     """
     Learning rate scheduler definition.
 
@@ -133,7 +137,7 @@ class LRSchedulerDefinition(BaseModel):
     warmup_steps: int = Field(0, ge=0)
 
 
-class Config(BaseModel):
+class Config(StrictModel):
     """
     Base configuration.
 
@@ -149,6 +153,7 @@ class Config(BaseModel):
 
     type: ConfigType
     project: str
+    meta: Dict[str, Any] = dict()
     log_interval: Union[EventStep, LogInterval] = EventStep.EPOCH_COMPLETED
 
 

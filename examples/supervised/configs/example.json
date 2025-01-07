@@ -7,7 +7,7 @@
     "log_interval": "epoch_completed",
     "checkpoints": [
         {
-            "n_saved": 3,
+            "num_saved": 3,
             "interval": {
                 "event": "iteration_completed",
                 "every": 1000
@@ -16,7 +16,7 @@
         {
             "metric": "SSIM",
             "mode": "max",
-            "n_saved": 1
+            "num_saved": 1
         }
     ],
     "datasets": {% include 'datasets.json' %},
@@ -47,9 +47,13 @@
             "params": {"data_range": 1.0}
         }
     },
+    "optimizer": {
+        "class_name": "torch.optim.AdamW",
+        "params": {"lr": 3e-4}
+    },
     "lr_scheduler": {
         "type": "cosine",
-        "start_value": 3e-4,
-        "end_value": 1e-7
+        "end_value": 1e-7,
+        "warmup_steps": 32
     }
 }

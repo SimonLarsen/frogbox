@@ -69,23 +69,23 @@
     "optimizer": {
         "class_name": "torch.optim.AdamW",
         "params": {
+            "lr": 3e-4,
             "betas": [0.5, 0.999]
         }
     },
     "disc_optimizer": {
         "class_name": "torch.optim.AdamW",
         "params": {
+            "lr": 3e-4,
             "betas": [0.5, 0.999]
         }
     },
     "lr_scheduler": {
         "type": "cosine",
-        "start_value": 3e-4,
         "end_value": 1e-7
     },
     "disc_lr_scheduler": {
         "type": "cosine",
-        "start_value": 3e-4,
         "end_value": 1e-7
     }
 }
