@@ -24,7 +24,7 @@ def create_lr_scheduler(
             optimizer=optimizer,
             start_factor=1.0,
             end_factor=config.end_value / start_value,
-            total_iters=config.warmup_steps,
+            total_iters=max_iterations - config.warmup_steps,
         )
     else:
         raise RuntimeError(f'Unsupported LR scheduler "{config.type}".')
