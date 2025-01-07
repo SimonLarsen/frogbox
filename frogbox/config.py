@@ -68,7 +68,7 @@ class CheckpointDefinition(StrictModel):
 
     metric: Optional[str] = None
     mode: CheckpointMode = CheckpointMode.MAX
-    num_saved: int = Field(3, ge=1)
+    num_saved: int = Field(default=3, ge=1)
     interval: Union[EventStep, LogInterval] = EventStep.EPOCH_COMPLETED
 
 
@@ -134,7 +134,7 @@ class LRSchedulerDefinition(StrictModel):
 
     type: SchedulerType = SchedulerType.COSINE
     end_value: float = 1e-7
-    warmup_steps: int = Field(0, ge=0)
+    warmup_steps: int = Field(default=0, ge=0)
 
 
 class Config(StrictModel):
@@ -192,12 +192,12 @@ class SupervisedConfig(Config):
         Learning rate scheduler.
     """
 
-    batch_size: int = Field(32, ge=1)
-    loader_workers: int = Field(0, ge=0)
-    max_epochs: int = Field(50, ge=1)
+    batch_size: int = Field(default=32, ge=1)
+    loader_workers: int = Field(default=0, ge=0)
+    max_epochs: int = Field(default=50, ge=1)
     clip_grad_norm: Optional[float] = None
     clip_grad_value: Optional[float] = None
-    gradient_accumulation_steps: int = Field(1, ge=1)
+    gradient_accumulation_steps: int = Field(default=1, ge=1)
     metrics: Dict[str, ObjectDefinition] = dict()
     checkpoints: Sequence[CheckpointDefinition] = (
         CheckpointDefinition(
