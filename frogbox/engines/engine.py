@@ -1,6 +1,7 @@
 from typing import (
     Callable,
-    Iterable,
+    Protocol,
+    Iterator,
     List,
     Any,
     Union,
@@ -11,6 +12,14 @@ from typing import (
 )
 import tqdm
 from .events import EventStep, MatchableEvent, Event
+
+
+class SizedIterable(Protocol):
+    def __len__(self):
+        pass
+
+    def __iter__(self):
+        pass
 
 
 class Engine:
@@ -57,20 +66,21 @@ class Engine:
             label = self.progress_label + " " + label
         return label
 
-    def _get_data_iterator(
-        self,
-        loader: Iterable,
-    ) -> Iterable:
-        iterator = loader
-        if self.show_progress:
-            desc = self._get_progress_label()
-            iterator = tqdm.tqdm(
-                iterator,
-                desc=desc,
-                ncols=80,
-                leave=False,
-            )
-        return iterator
+    def _get_data_iterator(self, loader: SizedIterable) -> Iterator:
+        return iter(loader)
+
+    def _get_data_length(self, loader: SizedIterable) -> int:
+        return len(loader)
+
+    def _get_progress_bar(self, loader: SizedIterable) -> tqdm.tqdm:
+        desc = self._get_progress_label()
+        return tqdm.tqdm(
+            iterable=loader,
+            desc=desc,
+            ncols=80,
+            leave=False,
+            disable=not self.show_progress,
+        )
 
     def _is_done(self) -> bool:
         return self.epoch >= self.max_epochs
@@ -94,7 +104,7 @@ class Engine:
     ):
         self.output_handlers.append(OutputHandler(function))
 
-    def run(self, loader: Iterable, max_epochs: int = 1) -> None:
+    def run(self, loader: SizedIterable, max_epochs: int = 1) -> None:
         self.max_epochs = max_epochs
 
         if self._is_done():
@@ -107,14 +117,21 @@ class Engine:
             self._fire_event(EventStep.EPOCH_STARTED)
 
             iterations = self._get_data_iterator(loader)
-            for batch in iterations:
+            pbar = self._get_progress_bar(loader)
+            epoch_length = self._get_data_length(loader)
+
+            for _ in range(epoch_length):
                 self._fire_event(EventStep.ITERATION_STARTED)
 
+                batch = next(iterations)
                 output = self.process_fn(batch)
                 self._handle_output(output)
 
                 self.iteration += 1
                 self._fire_event(EventStep.ITERATION_COMPLETED)
+                pbar.update()
+
+            pbar.close()
 
             self.epoch += 1
             self._fire_event(EventStep.EPOCH_COMPLETED)
