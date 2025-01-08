@@ -1,4 +1,4 @@
-from typing import cast, Union, Tuple, Any, Optional
+from typing import cast, Tuple, Any, Optional
 from os import PathLike
 from pathlib import Path
 from .config import (
@@ -12,8 +12,8 @@ import torch
 
 
 def load_model_checkpoint(
-    path: Union[str, PathLike],
-    config_path: Optional[Union[str, PathLike]] = None,
+    path: str | PathLike,
+    config_path: Optional[str | PathLike] = None,
 ) -> Tuple[Any, Config]:
     """
     Load model from checkpoint.

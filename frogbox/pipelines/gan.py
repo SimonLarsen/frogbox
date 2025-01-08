@@ -59,7 +59,7 @@ class DiscriminatorLoss(torch.nn.Module):
 ```
 """
 
-from typing import Dict, Optional, Union, Sequence, Callable, Any
+from typing import Dict, Optional, Sequence, Callable, Any
 from os import PathLike
 from functools import partial
 import torch
@@ -100,7 +100,7 @@ class GANPipeline(Pipeline):
     def __init__(
         self,
         config: GANConfig,
-        checkpoint: Optional[Union[str, PathLike]] = None,
+        checkpoint: Optional[str | PathLike] = None,
         checkpoint_keys: Optional[Sequence[str]] = None,
         logging: str = "online",
         wandb_id: Optional[str] = None,

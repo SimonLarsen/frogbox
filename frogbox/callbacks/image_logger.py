@@ -1,4 +1,4 @@
-from typing import Union, Sequence, Callable, Any, Optional
+from typing import Sequence, Callable, Any, Optional
 import torch
 from torchvision.transforms.functional import (
     center_crop,
@@ -21,7 +21,7 @@ class ImageLogger(Callback):
         split: str = "test",
         log_label: str = "test/images",
         resize_to_fit: bool = True,
-        interpolation: Union[str, InterpolationMode] = "nearest",
+        interpolation: str | InterpolationMode = "nearest",
         num_cols: Optional[int] = None,
         denormalize_input: bool = False,
         denormalize_target: bool = False,

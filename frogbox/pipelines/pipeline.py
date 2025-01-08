@@ -5,7 +5,6 @@ from typing import (
     Tuple,
     Mapping,
     Sequence,
-    Union,
     Callable,
 )
 from os import PathLike
@@ -115,7 +114,7 @@ class Pipeline(ABC):
 
     def _load_checkpoint(
         self,
-        path: Union[str, PathLike],
+        path: str | PathLike,
         to_load: Mapping[str, Any],
         to_unwrap: Optional[Sequence[str]] = None,
         keys: Optional[Sequence[str]] = None,

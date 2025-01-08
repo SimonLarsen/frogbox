@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, Union, Sequence
+from typing import Dict, Any, Optional, Sequence
 from os import PathLike
 from enum import Enum
 from pathlib import Path
@@ -69,7 +69,7 @@ class CheckpointDefinition(StrictModel):
     metric: Optional[str] = None
     mode: CheckpointMode = CheckpointMode.MAX
     num_saved: int = Field(default=3, ge=1)
-    interval: Union[EventStep, LogInterval] = EventStep.EPOCH_COMPLETED
+    interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
 
 
 class ObjectDefinition(StrictModel):
@@ -154,7 +154,7 @@ class Config(StrictModel):
     type: ConfigType
     project: str
     meta: Dict[str, Any] = dict()
-    log_interval: Union[EventStep, LogInterval] = EventStep.EPOCH_COMPLETED
+    log_interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
 
 
 class SupervisedConfig(Config):
@@ -253,7 +253,7 @@ class GANConfig(SupervisedConfig):
         return v
 
 
-def read_json_config(path: Union[str, PathLike]) -> Config:
+def read_json_config(path: str | PathLike) -> Config:
     """
     Read and render JSON config file and render using jinja2.
 
@@ -275,7 +275,7 @@ def read_json_config(path: Union[str, PathLike]) -> Config:
         raise RuntimeError(f"Unknown config type {config['type']}.")
 
 
-def parse_log_interval(e: Union[str, LogInterval]) -> MatchableEvent:
+def parse_log_interval(e: str | LogInterval) -> MatchableEvent:
     """Create matchable event from log interval configuration."""
     if isinstance(e, str):
         return Event(event=e)

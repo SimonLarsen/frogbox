@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional
 from abc import ABC, abstractmethod
 from enum import Enum
 
@@ -35,7 +35,7 @@ class EventList(MatchableEvent):
 class Event(MatchableEvent):
     def __init__(
         self,
-        event: Union[str, EventStep],
+        event: str | EventStep,
         every: Optional[int] = None,
         first: Optional[int] = None,
         last: Optional[int] = None,

@@ -4,7 +4,6 @@ from typing import (
     Iterator,
     List,
     Any,
-    Union,
     Dict,
     Mapping,
     Optional,
@@ -15,10 +14,10 @@ from .events import EventStep, MatchableEvent, Event
 
 
 class SizedIterable(Protocol):
-    def __len__(self):
+    def __len__(self) -> int:
         pass
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator:
         pass
 
 
@@ -87,7 +86,7 @@ class Engine:
 
     def add_event_handler(
         self,
-        event: Union[str, EventStep, MatchableEvent],
+        event: str | EventStep | MatchableEvent,
         function: Callable[..., None],
         *args,
         **kwargs,

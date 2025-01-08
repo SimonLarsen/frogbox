@@ -1,7 +1,6 @@
 from typing import (
     Mapping,
     Any,
-    Union,
     Callable,
     Sequence,
     Optional,
@@ -26,7 +25,7 @@ class Checkpoint:
         accelerator: Accelerator,
         config: Config,
         to_save: Mapping[str, Any],
-        output_folder: Union[str, os.PathLike],
+        output_folder: str | os.PathLike,
         global_step_function: Callable[[], int],
         score_function: Optional[Callable[[], float]] = None,
         score_name: Optional[str] = None,
@@ -136,7 +135,7 @@ class Checkpoint:
     @staticmethod
     def load_checkpoint(
         accelerator: Accelerator,
-        path: Union[str, os.PathLike],
+        path: str | os.PathLike,
         to_load: Mapping[str, Any],
         to_unwrap: Optional[Sequence[str]] = None,
     ) -> None:
