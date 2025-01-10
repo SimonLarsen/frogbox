@@ -222,6 +222,12 @@ class SupervisedConfig(Config):
         assert v == ConfigType.SUPERVISED
         return v
 
+    @field_validator("datasets")
+    @classmethod
+    def check_datasets(cls, v: Dict[str, ObjectDefinition]):
+        assert "train" in v, "datasets must contain key \"train\"."
+        return v
+
 
 class GANConfig(SupervisedConfig):
     """

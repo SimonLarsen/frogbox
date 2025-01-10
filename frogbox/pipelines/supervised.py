@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Sequence, Callable, Any
 from os import PathLike
+import warnings
 from functools import partial
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -190,10 +191,17 @@ class SupervisedPipeline(Pipeline):
             output_transform=evaluator_output_transform,
             progress_label="val",
         )
-        self.trainer.add_event_handler(
-            event=self.log_interval,
-            function=lambda: self.evaluator.run(self.loaders["val"]),
-        )
+
+        if "val" in self.loaders:
+            self.trainer.add_event_handler(
+                event=self.log_interval,
+                function=lambda: self.evaluator.run(self.loaders["val"]),
+            )
+        else:
+            warnings.warn(
+                "No \"val\" dataset provided."
+                " Validation will not be performed."
+            )
 
         # Set up metric logging
         self.metrics = {}
