@@ -1,3 +1,49 @@
+"""
+# Logging images
+
+The simplest way to log images during training is to create a callback with
+`frogbox.callbacks.image_logger.ImageLogger`:
+
+```python
+from frogbox import Events
+from frogbox.callbacks import ImageLogger
+
+image_logger = ImageLogger()
+
+pipeline.install_callback(
+    event="epoch_completed",
+    callback=image_logger,
+)
+```
+
+Images can automatically be denormalized by setting `denormalize_input`/`denormalize_output`
+and providing the mean and standard deviation used for normalization.
+
+For instance, if input images are normalized with ImageNet parameters and outputs are in [0, 1]:
+
+```python
+image_logger = ImageLogger(
+    normalize_mean=[0.485, 0.456, 0.406],
+    normalize_std=[0.229, 0.224, 0.225],
+    denormalize_input=True,
+)
+```
+
+More advanced transformations can be made by overriding `input_transform`, `model_transform`, or `output_transform`:
+
+```python
+from torchvision.transforms.functional import hflip
+
+def flip_input(x, y, y_pred):
+    x = hflip(x)
+    return x, y_pred, y
+
+image_logger = ImageLogger(
+    output_transform=flip_input,
+)
+```
+"""  # noqa: E501
+
 from typing import Sequence, Callable, Any, Optional
 import torch
 from torchvision.transforms.functional import (
@@ -11,6 +57,7 @@ import tqdm
 import wandb
 from .callback import Callback
 from ..pipelines.pipeline import Pipeline
+from ..utils import convert_tensor
 
 
 class ImageLogger(Callback):
@@ -129,9 +176,9 @@ class ImageLogger(Callback):
 
             x, y, y_pred = accelerator.gather_for_metrics((x, y, y_pred))
 
-            x = torch.as_tensor(x, device=torch.device("cpu"))
-            y = torch.as_tensor(y, device=torch.device("cpu"))
-            y_pred = torch.as_tensor(y_pred, device=torch.device("cpu"))
+            x = convert_tensor(x, device=torch.device("cpu"))
+            y = convert_tensor(y, device=torch.device("cpu"))
+            y_pred = convert_tensor(y_pred, device=torch.device("cpu"))
 
             if self._denormalize_input:
                 x = self._denormalize(x)
