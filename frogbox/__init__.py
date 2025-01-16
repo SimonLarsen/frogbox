@@ -2,7 +2,7 @@
 .. include:: ./intro.md
 """
 
-__version__ = "0.5.2"
+__version__ = "0.5.2b"
 
 from accelerate.utils import set_seed  # noqa: F401
 from .config import read_json_config, SupervisedConfig, GANConfig  # noqa: F401
