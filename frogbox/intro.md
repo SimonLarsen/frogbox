@@ -25,6 +25,7 @@ See example projects in `examples`.
 
 # Guides
 
+* [Using and implementing metrics](frogbox/metrics.html)
 * [Loading a trained model](frogbox/utils.html#loading-a-trained-model)
 * [Logging images to W&B](frogbox/callbacks/image_logger.html#logging-images)
 * [Custom callbacks](frogbox/callbacks.html#custom-callbacks)

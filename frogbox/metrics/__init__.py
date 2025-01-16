@@ -1,0 +1,4 @@
+"""
+@private
+.. include:: ./guide.md
+"""
