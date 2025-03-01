@@ -24,7 +24,7 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: python docs/make.py
 
-      - uses: actions/upload-pages-artifact@v2
+      - uses: actions/upload-pages-artifact@v3.0.1
         with:
           path: docs/
 
@@ -41,4 +41,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4.0.5
