@@ -8,6 +8,7 @@ from typing import (
     Dict,
 )
 import os
+import math
 from pathlib import Path
 from collections import namedtuple
 import torch
@@ -116,7 +117,7 @@ class Checkpoint:
             )
             min_priority = self._saved[min_index].priority
 
-            if priority < min_priority:
+            if math.isnan(priority) or priority < min_priority:
                 return
 
             os.remove(self._saved[min_index].filename)
