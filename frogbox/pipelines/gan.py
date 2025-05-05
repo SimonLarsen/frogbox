@@ -134,6 +134,24 @@ class GANPipeline(Pipeline):
     ):
         """
         Create GAN pipeline.
+
+        Parameters
+        ----------
+        config : GANConfig
+            Pipeline configuration.
+        checkpoint : path-like
+            Path to experiment checkpoint.
+        checkpoint_keys : list of str
+            List of keys for objects to load from checkpoint.
+            Defaults to all keys.
+        logging : str
+            Logging mode. Must be either "online" or "offline".
+        wandb_id : str
+            W&B run ID to resume from.
+        tags : list of str
+            List of tags to add to the run in W&B.
+        group : str
+            Group to add run to in W&B.
         """
 
         # Parse config
@@ -224,21 +242,21 @@ class GANPipeline(Pipeline):
             progress_label="train",
         )
 
-        OutputLogger(
-            "train/loss", self.log, lambda o: o[0]
-        ).attach(self.trainer)
-        OutputLogger(
-            "train/disc_loss", self.log, lambda o: o[1]
-        ).attach(self.trainer)
-        CompositeLossLogger(
-            self.loss_fn, self.log, "loss/"
-        ).attach(self.trainer)
-        CompositeLossLogger(
-            self.disc_loss_fn, self.log, "disc_loss/"
-        ).attach(self.trainer)
-        OptimizerLogger(
-            self.optimizer, ["lr"], self.log, "optimizer/"
-        ).attach(self.trainer)
+        OutputLogger("train/loss", self.log, lambda o: o[0]).attach(
+            self.trainer
+        )
+        OutputLogger("train/disc_loss", self.log, lambda o: o[1]).attach(
+            self.trainer
+        )
+        CompositeLossLogger(self.loss_fn, self.log, "loss/").attach(
+            self.trainer
+        )
+        CompositeLossLogger(self.disc_loss_fn, self.log, "disc_loss/").attach(
+            self.trainer
+        )
+        OptimizerLogger(self.optimizer, ["lr"], self.log, "optimizer/").attach(
+            self.trainer
+        )
         OptimizerLogger(
             self.disc_optimizer, ["lr"], self.log, "disc_optimizer/"
         ).attach(self.trainer)
@@ -260,7 +278,7 @@ class GANPipeline(Pipeline):
             )
         else:
             warnings.warn(
-                "No \"val\" dataset provided."
+                'No "val" dataset provided.'
                 " Validation will not be performed."
             )
 

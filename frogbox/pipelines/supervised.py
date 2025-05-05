@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Sequence, Callable, Any
+from typing import Dict, Optional, Sequence, Callable, Any, Mapping
 from os import PathLike
 import warnings
 from functools import partial
@@ -50,6 +50,9 @@ class SupervisedPipeline(Pipeline):
             y,
         ),
         trainer_model_transform: Callable[[Any], Any] = lambda output: output,
+        trainer_loss_transforms: Optional[
+            Mapping[str, Callable[[Any, Any], Any]]
+        ] = None,
         trainer_output_transform: Callable[
             [Any, Any, Any, Any], Any
         ] = lambda x, y, y_pred, loss: loss.item(),
@@ -90,6 +93,10 @@ class SupervisedPipeline(Pipeline):
         trainer_model_transform : callable
             Function that receives the output from the model during training
             and converts it into the form as required by the loss function.
+        trainer_loss_transforms : mapping of callables
+            Dictionary of functions that transform the inputs passed to each
+            loss function. Each function receives `y_pred` and `y`.
+            Default is returning `(y_pred, y)`.
         trainer_output_transform : callable
             Function that receives `x`, `y`, `y_pred`, `loss` and returns value
             to be assigned to trainer's `state.output` after each iteration.
@@ -159,7 +166,9 @@ class SupervisedPipeline(Pipeline):
             self.loaders[split] = self.accelerator.prepare(self.loaders[split])
 
         # Create trainer
-        self.loss_fn = self._create_composite_loss(config.losses)
+        self.loss_fn = self._create_composite_loss(
+            config.losses, trainer_loss_transforms
+        )
         self.trainer = SupervisedTrainer(
             accelerator=self.accelerator,
             model=self.model,
@@ -175,12 +184,12 @@ class SupervisedPipeline(Pipeline):
         )
 
         OutputLogger("train/loss", self.log).attach(self.trainer)
-        CompositeLossLogger(
-            self.loss_fn, self.log, "loss/"
-        ).attach(self.trainer)
-        OptimizerLogger(
-            self.optimizer, ["lr"], self.log, "optimizer/"
-        ).attach(self.trainer)
+        CompositeLossLogger(self.loss_fn, self.log, "loss/").attach(
+            self.trainer
+        )
+        OptimizerLogger(self.optimizer, ["lr"], self.log, "optimizer/").attach(
+            self.trainer
+        )
 
         # Create evaluator
         self.evaluator = SupervisedEvaluator(
@@ -199,7 +208,7 @@ class SupervisedPipeline(Pipeline):
             )
         else:
             warnings.warn(
-                "No \"val\" dataset provided."
+                'No "val" dataset provided.'
                 " Validation will not be performed."
             )
 

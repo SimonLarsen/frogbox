@@ -200,12 +200,14 @@ class SupervisedConfig(Config):
     gradient_accumulation_steps: int = Field(default=1, ge=1)
     metrics: Dict[str, ObjectDefinition] = dict()
     checkpoints: Sequence[CheckpointDefinition] = (
-        CheckpointDefinition(
-            metric=None,
-            num_saved=3,
-            interval=EventStep.EPOCH_COMPLETED,
-        )
-    ),
+        (
+            CheckpointDefinition(
+                metric=None,
+                num_saved=3,
+                interval=EventStep.EPOCH_COMPLETED,
+            )
+        ),
+    )
     model: ObjectDefinition
     losses: Dict[str, LossDefinition] = dict()
     datasets: Dict[str, ObjectDefinition]
@@ -225,7 +227,7 @@ class SupervisedConfig(Config):
     @field_validator("datasets")
     @classmethod
     def check_datasets(cls, v: Dict[str, ObjectDefinition]):
-        assert "train" in v, "datasets must contain key \"train\"."
+        assert "train" in v, 'datasets must contain key "train".'
         return v
 
 
@@ -244,6 +246,7 @@ class GANConfig(SupervisedConfig):
     disc_lr_scheduler : LRSchedulerDefinition
         Discriminator learning rate scheduler.
     """
+
     disc_model: ObjectDefinition
     disc_losses: Dict[str, LossDefinition] = dict()
     disc_optimizer: ObjectDefinition = ObjectDefinition(

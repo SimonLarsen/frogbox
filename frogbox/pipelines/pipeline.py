@@ -74,6 +74,7 @@ class Pipeline(ABC):
     def _create_composite_loss(
         self,
         config: Mapping[str, LossDefinition],
+        transforms: Optional[Mapping[str, Callable[[Any, Any], Any]]] = None,
     ) -> CompositeLoss:
         loss_labels = []
         loss_modules = []
@@ -87,6 +88,7 @@ class Pipeline(ABC):
             labels=loss_labels,
             losses=loss_modules,
             weights=loss_weights,
+            transforms=transforms,
         )
         loss_fn = loss_fn.to(self.device)
         return loss_fn
