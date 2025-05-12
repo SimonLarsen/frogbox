@@ -1,4 +1,4 @@
-name: website
+name: Publish Github page
 
 # build the documentation whenever there are new commits on main
 on:
@@ -16,13 +16,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - run: pip install -e .
-      - run: pip install -r requirements-dev.txt
-      - run: python docs/make.py
+      - name: Install package
+        run: |
+          pip install -e .
+          pip install -r requirements-dev.txt
+
+      - name: Build documentation with pydoc
+        run: python docs/make.py
 
       - uses: actions/upload-pages-artifact@v3.0.1
         with:
