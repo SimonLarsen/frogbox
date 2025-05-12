@@ -59,7 +59,7 @@ class DiscriminatorLoss(torch.nn.Module):
 ```
 """
 
-from typing import Dict, Optional, Sequence, Callable, Any
+from typing import Dict, Optional, Sequence, Callable, Any, Mapping
 from os import PathLike
 import warnings
 from functools import partial
@@ -112,6 +112,12 @@ class GANPipeline(Pipeline):
             y,
         ),
         trainer_model_transform: Callable[[Any], Any] = lambda output: output,
+        trainer_loss_transforms: Optional[
+            Mapping[str, Callable[[Any, Any], Any]]
+        ] = None,
+        trainer_disc_loss_transforms: Optional[
+            Mapping[str, Callable[[Any, Any], Any]]
+        ] = None,
         trainer_disc_model_transform: Callable[
             [Any], Any
         ] = lambda output: output,
@@ -221,8 +227,12 @@ class GANPipeline(Pipeline):
         for split in self.loaders.keys():
             self.loaders[split] = self.accelerator.prepare(self.loaders[split])
 
-        self.loss_fn = self._create_composite_loss(config.losses)
-        self.disc_loss_fn = self._create_composite_loss(config.disc_losses)
+        self.loss_fn = self._create_composite_loss(
+            config.losses, trainer_loss_transforms
+        )
+        self.disc_loss_fn = self._create_composite_loss(
+            config.disc_losses, trainer_disc_loss_transforms
+        )
         self.trainer = GANTrainer(
             accelerator=self.accelerator,
             model=self.model,
