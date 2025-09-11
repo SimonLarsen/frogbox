@@ -63,7 +63,7 @@ def project():
     "--type",
     "-t",
     "type_",
-    type=click.Choice(["supervised"]),
+    type=click.Choice(["supervised", "gan"]),
     default="supervised",
     help="Pipeline type.",
 )
@@ -87,6 +87,7 @@ def project():
 )
 def new_project(type_: str, dir_: Path, overwrite: bool = False):
     """Create a new project from template."""
+    from .config import ObjectDefinition, SupervisedConfig, GANConfig
 
     template_inputs = [
         f"train_{type_}.py",
@@ -119,20 +120,30 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
         output_path.write_text(file_data)
 
     # Create config template
-    if type_ == "supervised":
-        from .config import SupervisedConfig, ObjectDefinition
+    example_model = ObjectDefinition(class_name="models.example.ExampleModel")
+    example_dataset = ObjectDefinition(
+        class_name="datasets.example.ExampleDataset"
+    )
 
+    if type_ == "supervised":
         config_json = SupervisedConfig(
             type="supervised",
             project="example",
-            model=ObjectDefinition(class_name="models.example.ExampleModel"),
+            model=example_model,
             datasets={
-                "train": ObjectDefinition(
-                    class_name="datasets.example.ExampleDataset"
-                ),
-                "val": ObjectDefinition(
-                    class_name="datasets.example.ExampleDataset"
-                ),
+                "train": example_dataset,
+                "val": example_dataset,
+            },
+        ).model_dump_json(indent=4, exclude_none=True)
+    elif type_ == "gan":
+        config_json = GANConfig(
+            type="gan",
+            project="example",
+            model=example_model,
+            disc_model=example_model,
+            datasets={
+                "train": example_dataset,
+                "val": example_dataset,
             },
         ).model_dump_json(indent=4, exclude_none=True)
     else:
