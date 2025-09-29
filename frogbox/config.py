@@ -262,7 +262,11 @@ class GANConfig(SupervisedConfig):
         return v
 
 
-def read_json_config(path: str | PathLike) -> Config:
+def read_json_config(
+    path: str | PathLike,
+    *args: str,
+    **kwargs: str,
+) -> Config:
     """
     Read and render JSON config file and render using jinja2.
 
@@ -270,11 +274,26 @@ def read_json_config(path: str | PathLike) -> Config:
     ----------
     path : str or path-like
         Path to JSON config file.
+    args : sequence of strings
+        Arguments to pass to jinja2 to in form of "key=value".
+    kwargs : str-to-str mapping
+        Keyword arguments to pass to jinja2.
     """
+    # Parse template arguments
+    template_args = {}
+    for arg in args:
+        pos = arg.find("=")
+        assert pos >= 1
+        template_args[arg[:pos]] = arg[pos+1:]
+    template_args.update(kwargs)
+
+    # Read JSON template
     path = Path(path)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(path.parent)))
     template = env.get_template(str(path.relative_to(path.parent)))
-    config = json.loads(template.render())
+
+    # Render config and validate
+    config = json.loads(template.render(template_args))
     assert "type" in config
     if config["type"] == "supervised":
         return SupervisedConfig.model_validate(config)
