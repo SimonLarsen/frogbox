@@ -23,12 +23,13 @@ def parse_arguments(
     parser.add_argument("--wandb-id", type=str, required=False)
     parser.add_argument("--tags", type=str, nargs="+")
     parser.add_argument("--group", type=str)
+    parser.add_argument("-v", "--var", type=str, action="append", default=[])
     return parser.parse_args(args)
 
 
 if __name__ == "__main__":
     args = parse_arguments()
-    config = cast(GANConfig, read_json_config(args.config))
+    config = cast(GANConfig, read_json_config(args.config, *args.var))
 
     pipeline = GANPipeline(
         config=config,
