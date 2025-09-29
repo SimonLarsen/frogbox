@@ -3,9 +3,9 @@ from os import PathLike
 from enum import Enum
 from pathlib import Path
 import json
+from importlib import import_module
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 import jinja2
-from importlib import import_module
 from .engines.events import EventStep, Event, MatchableEvent
 
 
@@ -297,10 +297,9 @@ def read_json_config(
     assert "type" in config
     if config["type"] == "supervised":
         return SupervisedConfig.model_validate(config)
-    elif config["type"] == "gan":
+    if config["type"] == "gan":
         return GANConfig.model_validate(config)
-    else:
-        raise RuntimeError(f"Unknown config type {config['type']}.")
+    raise RuntimeError(f"Unknown config type {config['type']}.")
 
 
 def parse_log_interval(e: str | LogInterval) -> MatchableEvent:

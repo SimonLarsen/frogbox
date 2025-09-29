@@ -126,7 +126,7 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
     )
 
     if type_ == "supervised":
-        config_json = SupervisedConfig(
+        cfg = SupervisedConfig(
             type="supervised",
             project="example",
             model=example_model,
@@ -134,9 +134,9 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
                 "train": example_dataset,
                 "val": example_dataset,
             },
-        ).model_dump_json(indent=4, exclude_none=True)
+        )
     elif type_ == "gan":
-        config_json = GANConfig(
+        cfg = GANConfig(
             type="gan",
             project="example",
             model=example_model,
@@ -145,13 +145,14 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
                 "train": example_dataset,
                 "val": example_dataset,
             },
-        ).model_dump_json(indent=4, exclude_none=True)
+        )
     else:
         raise RuntimeError(f"Unknown pipeline type {type_}.")
 
+    cfg_json = cfg.model_dump_json(indent=4, exclude_none=True)
     output_path = dir_ / "configs" / "example.json"
     output_path.parent.mkdir(exist_ok=True, parents=True)
-    output_path.write_text(config_json)
+    output_path.write_text(cfg_json)
 
 
 if __name__ == "__main__":
