@@ -1,7 +1,7 @@
 def test_create_object_from_config():
-    from frogbox.config import ObjectDefinition, create_object_from_config
+    from frogbox.config import ClassDefinition, create_object_from_config
 
-    obj_def = ObjectDefinition(
+    obj_def = ClassDefinition(
         class_name="datetime.timedelta",
         params={
             "hours": 2,

@@ -22,25 +22,6 @@ def cli():
     )
 )
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
-def launch(args):
-    """
-    Launch script.
-
-    Alias for `accelerate launch`.
-    """
-    exec_path = shutil.which("accelerate")
-    cmd = [exec_path, "launch"] + list(args)
-    env = os.environ.copy()
-    subprocess.run(cmd, env=env, check=False)
-
-
-@cli.command(
-    context_settings=dict(
-        ignore_unknown_options=True,
-        help_option_names=[],
-    )
-)
-@click.argument("args", nargs=-1, type=click.UNPROCESSED)
 def config(args):
     """
     Configure training system.
@@ -63,7 +44,7 @@ def project():
     "--type",
     "-t",
     "type_",
-    type=click.Choice(["supervised", "gan"]),
+    type=click.Choice(["supervised"]),
     default="supervised",
     help="Pipeline type.",
 )
@@ -87,7 +68,11 @@ def project():
 )
 def new_project(type_: str, dir_: Path, overwrite: bool = False):
     """Create a new project from template."""
-    from .config import ObjectDefinition, SupervisedConfig, GANConfig
+    from .config import (
+        SupervisedConfig,
+        ClassDefinition,
+        ModelDefinition,
+    )
 
     template_inputs = [
         f"train_{type_}.py",
@@ -120,8 +105,10 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
         output_path.write_text(file_data)
 
     # Create config template
-    example_model = ObjectDefinition(class_name="models.example.ExampleModel")
-    example_dataset = ObjectDefinition(
+    example_model = ModelDefinition(
+        class_name="models.example.ExampleModel",
+    )
+    example_dataset = ClassDefinition(
         class_name="datasets.example.ExampleDataset"
     )
 
@@ -130,17 +117,6 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
             type="supervised",
             project="example",
             model=example_model,
-            datasets={
-                "train": example_dataset,
-                "val": example_dataset,
-            },
-        )
-    elif type_ == "gan":
-        cfg = GANConfig(
-            type="gan",
-            project="example",
-            model=example_model,
-            disc_model=example_model,
             datasets={
                 "train": example_dataset,
                 "val": example_dataset,

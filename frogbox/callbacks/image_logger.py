@@ -151,7 +151,7 @@ class ImageLogger(Callback):
             )
 
         model = pipeline.model
-        loaders = pipeline.loaders
+        loaders = pipeline._loaders
         accelerator = pipeline.accelerator
 
         model.eval()

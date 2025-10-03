@@ -6,20 +6,8 @@
     "max_epochs": 16,
     "log_interval": "epoch_completed",
     "checkpoints": [
-        {
-            "num_saved": 3,
-            "interval": {
-                "event": "iteration_completed",
-                "every": 1000
-            }
-        },
-        {
-            "metric": "SSIM",
-            "mode": "max",
-            "num_saved": 1
-        }
+        {"metric": "SSIM", "mode": "max", "num_saved": 1}
     ],
-    "datasets": {% include 'datasets.json' %},
     "model": {
         "class_name": "models.upscaler.Upscaler",
         "params": {
@@ -29,12 +17,36 @@
             "hidden_channels": 32,
             "num_layers": 4,
             "norm_groups": 4
+        },
+        "optimizers": {
+            "default": {
+                "class_name": "torch.optim.AdamW",
+                "params": {"lr": 1e-4},
+                "scheduler": {
+                    "type": "cosine",
+                    "end_value": 1e-7
+                }
+            }
         }
     },
     "losses": {
         "L1": {
             "weight": 1.0,
             "class_name": "torch.nn.L1Loss"
+        }
+    },
+    "datasets": {
+        "train": {
+            "class_name": "datasets.example.ExampleDataset",
+            "params": {"split": "train", "do_augment": true}
+        },
+        "val": {
+            "class_name": "datasets.example.ExampleDataset",
+            "params": {"split": "val", "do_augment": false}
+        },
+        "test": {
+            "class_name": "datasets.example.ExampleDataset",
+            "params": {"split": "test", "do_augment": false}
         }
     },
     "metrics": {
@@ -46,14 +58,5 @@
             "class_name": "torchmetrics.image.PeakSignalNoiseRatio",
             "params": {"data_range": 1.0}
         }
-    },
-    "optimizer": {
-        "class_name": "torch.optim.AdamW",
-        "params": {"lr": 3e-4}
-    },
-    "lr_scheduler": {
-        "type": "cosine",
-        "end_value": 1e-7,
-        "warmup_steps": 32
     }
 }
