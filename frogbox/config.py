@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, Sequence, Mapping
+from typing import Any, Optional, Sequence, Mapping, Union
 from os import PathLike
 from enum import Enum
 from pathlib import Path
@@ -11,7 +11,7 @@ import jinja2
 from .engines.events import EventStep, Event, MatchableEvent
 
 
-CONFIG_TYPE_EXTENSIONS: Dict[str, Sequence[str]] = {
+CONFIG_TYPE_EXTENSIONS: Mapping[str, Sequence[str]] = {
     "json": (".js", ".json"),
     "yaml": (".yml", ".yaml"),
 }
@@ -81,19 +81,7 @@ class CheckpointDefinition(StrictModel):
     mode: CheckpointMode = CheckpointMode.MAX
 
 
-class FunctionDefinition(StrictModel):
-    """
-    Function definition.
-
-    Attributes
-    ----------
-    function : str
-        Function path string. Example: `torch.nn.functional.normalize`.
-    params : str
-        Keyword arguments to pass when calling function.
-    """
-    function: str
-    params: Dict[str, Any] = {}
+ObjectArgument = Union["ClassDefinition", "FunctionDefinition", Any]
 
 
 class ClassDefinition(StrictModel):
@@ -109,7 +97,25 @@ class ClassDefinition(StrictModel):
     """
 
     class_name: str
-    params: Dict[str, Any] = {}
+    args: Sequence[ObjectArgument] = []
+    kwargs: Mapping[str, ObjectArgument] = {}
+
+
+class FunctionDefinition(StrictModel):
+    """
+    Function definition.
+
+    Attributes
+    ----------
+    function : str
+        Function path string. Example: `torch.nn.functional.normalize`.
+    kwargs : str
+        Keyword arguments to pass when calling function.
+    """
+
+    function: str
+    args: Sequence[ObjectArgument] = []
+    kwargs: Mapping[str, ObjectArgument] = {}
 
 
 class SchedulerType(str, Enum):
@@ -152,8 +158,9 @@ class OptimizerDefinition(ClassDefinition):
     """
     Optimizer definition.
     """
+
     class_name: str = "torch.optim.AdamW"
-    params: Dict[str, Any] = {"lr": 1e-3}
+    kwargs: Mapping[str, ObjectArgument] = {"lr": 1e-3}
     target: Optional[str] = None
     scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
 
@@ -162,7 +169,8 @@ class ModelDefinition(ClassDefinition):
     """
     Model definition.
     """
-    optimizers: Dict[str, OptimizerDefinition] = {
+
+    optimizers: Mapping[str, OptimizerDefinition] = {
         "default": OptimizerDefinition()
     }
 
@@ -176,6 +184,7 @@ class LossDefinition(ClassDefinition):
     weight : float
         Loss function weight.
     """
+
     weight: float = 1.0
 
 
@@ -225,9 +234,9 @@ class Config(StrictModel):
             )
         ),
     )
-    datasets: Dict[str, ClassDefinition]
-    loaders: Dict[str, ClassDefinition] = {}
-    metrics: Dict[str, ClassDefinition] = {}
+    datasets: Mapping[str, ClassDefinition]
+    loaders: Mapping[str, ClassDefinition] = {}
+    metrics: Mapping[str, ClassDefinition] = {}
 
 
 class SupervisedConfig(Config):
@@ -249,7 +258,9 @@ class SupervisedConfig(Config):
     clip_grad_norm: Optional[float] = None
     clip_grad_value: Optional[float] = None
     model: ModelDefinition
-    losses: Dict[str, LossDefinition] = {}
+    losses: Mapping[str, LossDefinition] = {}
+    trainer_forward: Optional[FunctionDefinition | ClassDefinition] = None
+    evaluator_forward: Optional[FunctionDefinition | ClassDefinition] = None
 
     @field_validator("type")
     @classmethod
@@ -259,7 +270,7 @@ class SupervisedConfig(Config):
 
     @field_validator("datasets")
     @classmethod
-    def check_datasets(cls, v: Dict[str, ClassDefinition]):
+    def check_datasets(cls, v: Mapping[str, ClassDefinition]):
         assert "train" in v, 'datasets must contain key "train".'
         return v
 
@@ -282,7 +293,7 @@ def _guess_config_type(path: str | PathLike) -> str:
 def read_config(
     path: str | PathLike,
     type: Optional[str] = None,
-    config_kwargs: Optional[Mapping[str, str]] = None,
+    config_vars: Optional[Mapping[str, str]] = None,
 ) -> Config:
     """
     Read and render config file using jinja2.
@@ -297,8 +308,8 @@ def read_config(
     config_kwargs : str-to-str mapping
         Keyword arguments to pass to jinja2.
     """
-    if config_kwargs is None:
-        config_kwargs = {}
+    if config_vars is None:
+        config_vars = {}
 
     if type is not None:
         type = type.lower()
@@ -312,7 +323,7 @@ def read_config(
     template = env.get_template(str(path.relative_to(path.parent)))
 
     # Parse template
-    data = template.render(config_kwargs)
+    data = template.render(config_vars)
     if type == "json":
         config = json.loads(data)
     else:
@@ -359,7 +370,8 @@ def _get_module(path: str) -> Any:
 
 def create_object_from_config(
     config: ClassDefinition | FunctionDefinition,
-    **kwargs,
+    *additional_args: Any,
+    **additional_kwargs: Any,
 ) -> Any:
     """
     Create object from dictionary configuration.
@@ -370,16 +382,33 @@ def create_object_from_config(
     >>> config = {"class": "torch.optim.Adam", "params": {"lr": 1e-5}}
     >>> optimizer = create_object_from_config(config)
     """
+    # Recursively parse arguments
+    args = []
+    for arg in config.args:
+        if (
+            isinstance(arg, ClassDefinition) or
+            isinstance(arg, FunctionDefinition)
+        ):
+            arg = create_object_from_config(arg)
+        args.append(arg)
+    args.extend(additional_args)
+
+    # Recursively parse keyword arguments
+    kwargs = dict(additional_kwargs)
+    for key, value in config.kwargs.items():
+        if (
+            isinstance(value, ClassDefinition) or
+            isinstance(value, FunctionDefinition)
+        ):
+            value = create_object_from_config(value)
+        kwargs[key] = value
+
     if isinstance(config, ClassDefinition):
         obj_class = _get_module(config.class_name)
-        params = dict(kwargs)
-        params.update(config.params)
-        return obj_class(**params)
+        return obj_class(*args, **kwargs)
 
     if isinstance(config, FunctionDefinition):
         fun = _get_module(config.function)
-        params = dict(kwargs)
-        params.update(config.params)
-        return partial(fun, **params)
+        return partial(fun, *args, **kwargs)
 
     return RuntimeError(f"Cannot create object from {type(config)}.")

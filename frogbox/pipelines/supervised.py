@@ -2,7 +2,7 @@ from typing import Optional, Sequence, Mapping, Callable, Any, Tuple, Dict
 from os import PathLike
 import torch
 from .pipeline import Pipeline
-from ..config import SupervisedConfig
+from ..config import SupervisedConfig, create_object_from_config
 from ..engines.engine import Trainer, Evaluator
 from ..engines.supervised import SupervisedTrainer, SupervisedEvaluator
 
@@ -47,6 +47,11 @@ class SupervisedPipeline(Pipeline):
                 optimizers=optimizers["model"],
                 schedulers=schedulers["model"],
                 loss_fn=losses["model"],
+                forward=(
+                    create_object_from_config(config.trainer_forward)
+                    if config.trainer_forward is not None
+                    else None
+                ),
                 clip_grad_norm=config.clip_grad_norm,
                 clip_grad_value=config.clip_grad_value,
             )
@@ -54,7 +59,14 @@ class SupervisedPipeline(Pipeline):
         def evaluator_factory(
             models: Mapping[str, torch.nn.Module]
         ) -> Evaluator:
-            return SupervisedEvaluator(models["model"])
+            return SupervisedEvaluator(
+                model=models["model"],
+                forward=(
+                    create_object_from_config(config.evaluator_forward)
+                    if config.evaluator_forward is not None
+                    else None
+                ),
+            )
 
         super().__init__(
             config=config,

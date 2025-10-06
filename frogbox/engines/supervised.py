@@ -5,6 +5,10 @@ from accelerate import Accelerator
 from .engine import Trainer, Evaluator
 
 
+def _default_forward(x: Any, y: Any, model: Callable) -> Tuple[Any, Any]:
+    return y, model(x)
+
+
 class SupervisedTrainer(Trainer):
     def __init__(
         self,
@@ -12,13 +16,20 @@ class SupervisedTrainer(Trainer):
         optimizers: Mapping[str, torch.optim.Optimizer],
         schedulers: Mapping[str, LRScheduler],
         loss_fn: Callable[[Any, Any], Any],
+        forward: Optional[
+            Callable[[Any, Any, Callable], Tuple[Any, Any]]
+        ] = None,
         clip_grad_norm: Optional[float] = None,
         clip_grad_value: Optional[float] = None,
     ):
+        if forward is None:
+            forward = _default_forward
+
         self.model = model
         self.optimizers = optimizers
         self.schedulers = schedulers
         self.loss_fn = loss_fn
+        self.forward = forward
 
         self.clip_grad_norm = clip_grad_norm
         self.clip_grad_value = clip_grad_value
@@ -32,15 +43,15 @@ class SupervisedTrainer(Trainer):
     ):
         self.model.train()
 
-        inputs, targets = batch
+        x, y = batch
 
         with accelerator.accumulate(self.model):
             for optimizer in self.optimizers.values():
                 optimizer.zero_grad()
 
-            outputs = self.model(inputs)
+            y, y_pred = self.forward(x, y, self.model)
 
-            loss = self.loss_fn(outputs, targets)
+            loss = self.loss_fn(y_pred, y)
             accelerator.backward(loss)
 
             if accelerator.sync_gradients:
@@ -65,8 +76,18 @@ class SupervisedTrainer(Trainer):
 
 
 class SupervisedEvaluator(Evaluator):
-    def __init__(self, model: torch.nn.Module):
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        forward: Optional[
+            Callable[[Any, Any, Callable], Tuple[Any, Any]]
+        ] = None,
+    ):
+        if forward is None:
+            forward = _default_forward
+
         self.model = model
+        self.forward = forward
 
         super().__init__(process_fn=self.process)
 
@@ -77,13 +98,10 @@ class SupervisedEvaluator(Evaluator):
     ):
         self.model.eval()
 
-        inputs, targets = batch
+        x, y = batch
 
         with torch.no_grad():
-            outputs = self.model(inputs)
+            y, y_pred = self.forward(x, y, self.model)
 
-        outputs, targets = accelerator.gather_for_metrics(
-            (outputs, targets)
-        )
-
-        return outputs, targets
+        y_pred, y = accelerator.gather_for_metrics((y_pred, y))
+        return y_pred, y

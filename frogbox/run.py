@@ -33,20 +33,20 @@ def _validate_vars(ctx, param, values) -> Mapping[str, str]:
 @click.option(
     "--var",
     "-v",
-    "config_kwargs",
+    "config_vars",
     type=str,
     multiple=True,
     callback=_validate_vars,
 )
 def run(
     config: Path,
-    config_kwargs: Optional[Mapping[str, str]] = None,
+    config_vars: Optional[Mapping[str, str]] = None,
     **kwargs,
 ) -> Pipeline:
-    if config_kwargs is None:
-        config_kwargs = {}
+    if config_vars is None:
+        config_vars = {}
 
-    cfg = read_config(config, config_kwargs=config_kwargs)
+    cfg = read_config(config, config_vars=config_vars)
     if cfg.type == "supervised":
         cfg = cast(SupervisedConfig, cfg)
         pipeline = SupervisedPipeline(cfg, **kwargs)

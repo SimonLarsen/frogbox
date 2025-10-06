@@ -63,8 +63,8 @@ class Pipeline(ABC):
     def __init__(
         self,
         config: Config,
-        models: Dict[str, ModelDefinition],
-        losses: Dict[str, Dict[str, LossDefinition]],
+        models: Mapping[str, ModelDefinition],
+        losses: Mapping[str, Mapping[str, LossDefinition]],
         trainer: TrainerFactory,
         evaluator: EvaluatorFactory,
         checkpoint: Optional[str | PathLike] = None,
@@ -101,9 +101,7 @@ class Pipeline(ABC):
         # Log trainer losses
         for name, loss in self._losses.items():
             CompositeLossLogger(
-                loss=loss,
-                log_function=self.log,
-                prefix=f"loss/{name}/"
+                loss=loss, log_function=self.log, prefix=f"loss/{name}/"
             ).attach(self.trainer)
 
         # Log learning rates
@@ -241,7 +239,9 @@ class Pipeline(ABC):
                 self._optimizers[model_name][optimizer_name] = optimizer
                 self._schedulers[model_name][optimizer_name] = scheduler
 
-    def _create_losses(self, losses: Dict[str, Dict[str, LossDefinition]]):
+    def _create_losses(
+        self, losses: Mapping[str, Mapping[str, LossDefinition]]
+    ):
         self._losses = {}
         for name, cfg in losses.items():
             self._losses[name] = self._create_composite_loss(cfg)
@@ -372,7 +372,7 @@ class Pipeline(ABC):
         finally:
             self.accelerator.end_training()
 
-    def log(self, data: Dict[str, Any]) -> None:
+    def log(self, data: Mapping[str, Any]) -> None:
         """Log data to tracker(s)."""
         self.accelerator.log(data, step=self.trainer.iteration)
 
