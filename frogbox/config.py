@@ -98,8 +98,8 @@ ObjectArgument = Union["ObjectDefinition", Any]
 class ObjectDefinition(StrictModel):
     object: Optional[str] = None
     function: Optional[str] = None
-    args: Sequence[ObjectArgument] = []
-    kwargs: Mapping[str, ObjectArgument] = {}
+    args: Optional[Sequence[ObjectArgument]] = None
+    kwargs: Optional[Mapping[str, ObjectArgument]] = None
 
     @model_validator(mode="after")
     def verify_object_or_function(self) -> "ObjectDefinition":
@@ -109,40 +109,6 @@ class ObjectDefinition(StrictModel):
                 ' "object" or "function" field.'
             )
         return self
-
-
-# class ClassDefinition(StrictModel):
-#     """
-#     Object instance definition.
-#
-#     Attributes
-#     ----------
-#     class_name : str
-#         Class path string. Example: `torch.optim.AdamW`.
-#     params : dict
-#         Dictionary of parameters to pass object constructor.
-#     """
-#
-#     class_name: str
-#     args: Sequence[ObjectArgument] = []
-#     kwargs: Mapping[str, ObjectArgument] = {}
-#
-#
-# class FunctionDefinition(StrictModel):
-#     """
-#     Function definition.
-#
-#     Attributes
-#     ----------
-#     function : str
-#         Function path string. Example: `torch.nn.functional.normalize`.
-#     kwargs : str
-#         Keyword arguments to pass when calling function.
-#     """
-#
-#     function: str
-#     args: Sequence[ObjectArgument] = []
-#     kwargs: Mapping[str, ObjectArgument] = {}
 
 
 class SchedulerType(str, Enum):
@@ -275,6 +241,12 @@ class Config(StrictModel):
     metrics: Mapping[str, ObjectDefinition] = {}
     callbacks: Sequence[CallbackDefinition] = []
 
+    @field_validator("datasets")
+    @classmethod
+    def check_datasets(cls, v: Mapping[str, ObjectDefinition]):
+        assert "train" in v, 'datasets must contain key "train".'
+        return v
+
 
 class SupervisedConfig(Config):
     """
@@ -292,6 +264,7 @@ class SupervisedConfig(Config):
         Loss functions.
     """
 
+    type: ConfigType = Field(default=ConfigType.SUPERVISED, frozen=True)
     clip_grad_norm: Optional[float] = None
     clip_grad_value: Optional[float] = None
     model: ModelDefinition
@@ -303,12 +276,6 @@ class SupervisedConfig(Config):
     @classmethod
     def check_type(cls, v: ConfigType) -> ConfigType:
         assert v == ConfigType.SUPERVISED
-        return v
-
-    @field_validator("datasets")
-    @classmethod
-    def check_datasets(cls, v: Mapping[str, ObjectDefinition]):
-        assert "train" in v, 'datasets must contain key "train".'
         return v
 
 
@@ -421,18 +388,20 @@ def create_object_from_config(
     """
     # Recursively parse arguments
     args = []
-    for arg in config.args:
-        if isinstance(arg, ObjectDefinition):
-            arg = create_object_from_config(arg)
-        args.append(arg)
+    if config.args:
+        for arg in config.args:
+            if isinstance(arg, ObjectDefinition):
+                arg = create_object_from_config(arg)
+            args.append(arg)
     args.extend(additional_args)
 
     # Recursively parse keyword arguments
     kwargs = dict(additional_kwargs)
-    for key, value in config.kwargs.items():
-        if isinstance(value, ObjectDefinition):
-            value = create_object_from_config(value)
-        kwargs[key] = value
+    if config.kwargs:
+        for key, value in config.kwargs.items():
+            if isinstance(value, ObjectDefinition):
+                value = create_object_from_config(value)
+            kwargs[key] = value
 
     if config.object is not None:
         obj_class = _get_module(config.object)

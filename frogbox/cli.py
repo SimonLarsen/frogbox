@@ -1,10 +1,7 @@
 """@private"""
 
 from pathlib import Path
-import os
-import shutil
 import importlib
-import subprocess
 import click
 
 
@@ -13,25 +10,6 @@ def cli():
     """
     An opinionated machine learning framework.
     """
-
-
-@cli.command(
-    context_settings=dict(
-        ignore_unknown_options=True,
-        help_option_names=[],
-    )
-)
-@click.argument("args", nargs=-1, type=click.UNPROCESSED)
-def config(args):
-    """
-    Configure training system.
-
-    Alias for `accelerate config`.
-    """
-    exec_path = shutil.which("accelerate")
-    cmd = [exec_path, "config"] + list(args)
-    env = os.environ.copy()
-    subprocess.run(cmd, env=env, check=False)
 
 
 @cli.group()
@@ -47,6 +25,14 @@ def project():
     type=click.Choice(["supervised"]),
     default="supervised",
     help="Pipeline type.",
+)
+@click.option(
+    "--format",
+    "-f",
+    "format_",
+    type=click.Choice(["yaml", "json"]),
+    default="yaml",
+    help="Config file type.",
 )
 @click.option(
     "--dir",
@@ -66,22 +52,22 @@ def project():
     is_flag=True,
     help="Overwrite existing files if present.",
 )
-def new_project(type_: str, dir_: Path, overwrite: bool = False):
+def new_project(type_: str, format_: str, dir_: Path, overwrite: bool = False):
     """Create a new project from template."""
+    import json
     from .config import (
+        ConfigType,
         SupervisedConfig,
         ObjectDefinition,
         ModelDefinition,
     )
 
     template_inputs = [
-        f"train_{type_}.py",
         "model.py",
         "dataset.py",
     ]
 
     template_outputs = [
-        dir_ / "train.py",
         dir_ / "models" / "example.py",
         dir_ / "datasets" / "example.py",
     ]
@@ -114,7 +100,7 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
 
     if type_ == "supervised":
         cfg = SupervisedConfig(
-            type="supervised",
+            type=ConfigType.SUPERVISED,
             project="example",
             model=example_model,
             datasets={
@@ -126,9 +112,19 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
         raise RuntimeError(f"Unknown pipeline type {type_}.")
 
     cfg_json = cfg.model_dump_json(indent=4, exclude_none=True)
-    output_path = dir_ / "configs" / "example.json"
+    if format_ == "yaml":
+        import yaml
+
+        cfg_data = yaml.safe_dump(json.loads(cfg_json))
+        output_path = dir_ / "configs" / "example.yaml"
+    elif format_ == "json":
+        cfg_data = cfg_json
+        output_path = dir_ / "configs" / "example.json"
+    else:
+        raise ValueError(f"Unknown file format \"{format_}\".")
+
     output_path.parent.mkdir(exist_ok=True, parents=True)
-    output_path.write_text(cfg_json)
+    output_path.write_text(cfg_data)
 
 
 if __name__ == "__main__":
