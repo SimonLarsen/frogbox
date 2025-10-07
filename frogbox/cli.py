@@ -70,7 +70,7 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
     """Create a new project from template."""
     from .config import (
         SupervisedConfig,
-        ClassDefinition,
+        ObjectDefinition,
         ModelDefinition,
     )
 
@@ -106,10 +106,10 @@ def new_project(type_: str, dir_: Path, overwrite: bool = False):
 
     # Create config template
     example_model = ModelDefinition(
-        class_name="models.example.ExampleModel",
+        object="models.example.ExampleModel",
     )
-    example_dataset = ClassDefinition(
-        class_name="datasets.example.ExampleDataset"
+    example_dataset = ObjectDefinition(
+        object="datasets.example.ExampleDataset"
     )
 
     if type_ == "supervised":

@@ -6,7 +6,13 @@ from functools import partial
 import json
 import yaml
 from importlib import import_module
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 import jinja2
 from .engines.events import EventStep, Event, MatchableEvent
 
@@ -27,6 +33,11 @@ class ConfigType(str, Enum):
     """Pipeline configuration type."""
 
     SUPERVISED = "supervised"
+
+
+class EngineType(str, Enum):
+    TRAINER = "trainer"
+    EVALUATOR = "evaluator"
 
 
 class LogInterval(StrictModel):
@@ -81,41 +92,57 @@ class CheckpointDefinition(StrictModel):
     mode: CheckpointMode = CheckpointMode.MAX
 
 
-ObjectArgument = Union["ClassDefinition", "FunctionDefinition", Any]
+ObjectArgument = Union["ObjectDefinition", Any]
 
 
-class ClassDefinition(StrictModel):
-    """
-    Object instance definition.
-
-    Attributes
-    ----------
-    class_name : str
-        Class path string. Example: `torch.optim.AdamW`.
-    params : dict
-        Dictionary of parameters to pass object constructor.
-    """
-
-    class_name: str
+class ObjectDefinition(StrictModel):
+    object: Optional[str] = None
+    function: Optional[str] = None
     args: Sequence[ObjectArgument] = []
     kwargs: Mapping[str, ObjectArgument] = {}
 
+    @model_validator(mode="after")
+    def verify_object_or_function(self) -> "ObjectDefinition":
+        if self.object is not None and self.function is not None:
+            raise ValueError(
+                "Object definition should only have either"
+                ' "object" or "function" field.'
+            )
+        return self
 
-class FunctionDefinition(StrictModel):
-    """
-    Function definition.
 
-    Attributes
-    ----------
-    function : str
-        Function path string. Example: `torch.nn.functional.normalize`.
-    kwargs : str
-        Keyword arguments to pass when calling function.
-    """
-
-    function: str
-    args: Sequence[ObjectArgument] = []
-    kwargs: Mapping[str, ObjectArgument] = {}
+# class ClassDefinition(StrictModel):
+#     """
+#     Object instance definition.
+#
+#     Attributes
+#     ----------
+#     class_name : str
+#         Class path string. Example: `torch.optim.AdamW`.
+#     params : dict
+#         Dictionary of parameters to pass object constructor.
+#     """
+#
+#     class_name: str
+#     args: Sequence[ObjectArgument] = []
+#     kwargs: Mapping[str, ObjectArgument] = {}
+#
+#
+# class FunctionDefinition(StrictModel):
+#     """
+#     Function definition.
+#
+#     Attributes
+#     ----------
+#     function : str
+#         Function path string. Example: `torch.nn.functional.normalize`.
+#     kwargs : str
+#         Keyword arguments to pass when calling function.
+#     """
+#
+#     function: str
+#     args: Sequence[ObjectArgument] = []
+#     kwargs: Mapping[str, ObjectArgument] = {}
 
 
 class SchedulerType(str, Enum):
@@ -154,7 +181,7 @@ class LRSchedulerDefinition(StrictModel):
     warmup_steps: int = Field(default=0, ge=0)
 
 
-class OptimizerDefinition(ClassDefinition):
+class OptimizerDefinition(ObjectDefinition):
     """
     Optimizer definition.
     """
@@ -165,7 +192,7 @@ class OptimizerDefinition(ClassDefinition):
     scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
 
 
-class ModelDefinition(ClassDefinition):
+class ModelDefinition(ObjectDefinition):
     """
     Model definition.
     """
@@ -175,7 +202,7 @@ class ModelDefinition(ClassDefinition):
     }
 
 
-class LossDefinition(ClassDefinition):
+class LossDefinition(ObjectDefinition):
     """
     Loss function definition
 
@@ -186,6 +213,15 @@ class LossDefinition(ClassDefinition):
     """
 
     weight: float = 1.0
+
+
+class CallbackDefinition(ObjectDefinition):
+    """
+    Callback definition.
+    """
+
+    interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
+    engine: EngineType = EngineType.TRAINER
 
 
 class Config(StrictModel):
@@ -234,9 +270,10 @@ class Config(StrictModel):
             )
         ),
     )
-    datasets: Mapping[str, ClassDefinition]
-    loaders: Mapping[str, ClassDefinition] = {}
-    metrics: Mapping[str, ClassDefinition] = {}
+    datasets: Mapping[str, ObjectDefinition]
+    loaders: Mapping[str, ObjectDefinition] = {}
+    metrics: Mapping[str, ObjectDefinition] = {}
+    callbacks: Sequence[CallbackDefinition] = []
 
 
 class SupervisedConfig(Config):
@@ -259,8 +296,8 @@ class SupervisedConfig(Config):
     clip_grad_value: Optional[float] = None
     model: ModelDefinition
     losses: Mapping[str, LossDefinition] = {}
-    trainer_forward: Optional[FunctionDefinition | ClassDefinition] = None
-    evaluator_forward: Optional[FunctionDefinition | ClassDefinition] = None
+    trainer_forward: Optional[ObjectDefinition] = None
+    evaluator_forward: Optional[ObjectDefinition] = None
 
     @field_validator("type")
     @classmethod
@@ -270,7 +307,7 @@ class SupervisedConfig(Config):
 
     @field_validator("datasets")
     @classmethod
-    def check_datasets(cls, v: Mapping[str, ClassDefinition]):
+    def check_datasets(cls, v: Mapping[str, ObjectDefinition]):
         assert "train" in v, 'datasets must contain key "train".'
         return v
 
@@ -369,7 +406,7 @@ def _get_module(path: str) -> Any:
 
 
 def create_object_from_config(
-    config: ClassDefinition | FunctionDefinition,
+    config: ObjectDefinition,
     *additional_args: Any,
     **additional_kwargs: Any,
 ) -> Any:
@@ -385,10 +422,7 @@ def create_object_from_config(
     # Recursively parse arguments
     args = []
     for arg in config.args:
-        if (
-            isinstance(arg, ClassDefinition) or
-            isinstance(arg, FunctionDefinition)
-        ):
+        if isinstance(arg, ObjectDefinition):
             arg = create_object_from_config(arg)
         args.append(arg)
     args.extend(additional_args)
@@ -396,19 +430,16 @@ def create_object_from_config(
     # Recursively parse keyword arguments
     kwargs = dict(additional_kwargs)
     for key, value in config.kwargs.items():
-        if (
-            isinstance(value, ClassDefinition) or
-            isinstance(value, FunctionDefinition)
-        ):
+        if isinstance(value, ObjectDefinition):
             value = create_object_from_config(value)
         kwargs[key] = value
 
-    if isinstance(config, ClassDefinition):
-        obj_class = _get_module(config.class_name)
+    if config.object is not None:
+        obj_class = _get_module(config.object)
         return obj_class(*args, **kwargs)
 
-    if isinstance(config, FunctionDefinition):
+    if config.function is not None:
         fun = _get_module(config.function)
         return partial(fun, *args, **kwargs)
 
-    return RuntimeError(f"Cannot create object from {type(config)}.")
+    return RuntimeError("Cannot create object from definition.")

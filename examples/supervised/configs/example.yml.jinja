@@ -12,17 +12,14 @@ checkpoints:
   num_saved: 1
 
 model:
-  class_name: models.upscaler.Upscaler
+  object: models.upscaler.Upscaler
   kwargs:
-    hidden_channels: 32
-    in_channels: 3
-    norm_groups: 4
-    num_layers: 4
-    out_channels: 3
     scale_factor: 2
+    hidden_channels: 32
+    num_layers: 4
   optimizers:
     default:
-      class_name: torch.optim.AdamW
+      object: torch.optim.AdamW
       kwargs: 
         lr: 1.0e-3
       scheduler:
@@ -31,32 +28,36 @@ model:
 
 datasets:
   train:
-    class_name: datasets.example.ExampleDataset
+    object: datasets.example.ExampleDataset
     kwargs:
       do_augment: true
       split: train
   val:
-    class_name: datasets.example.ExampleDataset
+    object: datasets.example.ExampleDataset
     kwargs:
       do_augment: false
       split: val
   test:
-    class_name: datasets.example.ExampleDataset
+    object: datasets.example.ExampleDataset
     kwargs:
       do_augment: false
       split: test
 
 losses:
   L1:
-    class_name: torch.nn.L1Loss
+    object: torch.nn.L1Loss
     weight: 1.0
 
 metrics:
   PSNR:
-    class_name: torchmetrics.image.PeakSignalNoiseRatio
+    object: torchmetrics.image.PeakSignalNoiseRatio
     kwargs: 
       data_range: 1.0
   SSIM:
-    class_name: torchmetrics.image.StructuralSimilarityIndexMeasure
+    object: torchmetrics.image.StructuralSimilarityIndexMeasure
     kwargs:
       data_range: 1.0
+
+callbacks:
+- object: frogbox.callbacks.ImageLogger
+  interval: epoch_completed

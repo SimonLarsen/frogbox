@@ -28,7 +28,7 @@ from ..engines.engine import (
 from ..engines.events import MatchableEvent
 from ..config import (
     Config,
-    ClassDefinition,
+    ObjectDefinition,
     ModelDefinition,
     LossDefinition,
     parse_log_interval,
@@ -172,12 +172,20 @@ class Pipeline(ABC):
                 keys=checkpoint_keys,
             )
 
+        # Install callbacks
+        for cfg in config.callbacks:
+            self.install_callback(
+                event=parse_log_interval(cfg.interval),
+                callback=create_object_from_config(cfg),
+                engine=cfg.engine,
+            )
+
     def _create_data_loaders(
         self,
         batch_size: int,
         loader_workers: int,
-        datasets: Mapping[str, ClassDefinition],
-        loaders: Optional[Mapping[str, ClassDefinition]] = None,
+        datasets: Mapping[str, ObjectDefinition],
+        loaders: Optional[Mapping[str, ObjectDefinition]] = None,
     ):
         if loaders is None:
             loaders = {}
@@ -269,7 +277,7 @@ class Pipeline(ABC):
 
     def _create_metrics(
         self,
-        config: Mapping[str, ClassDefinition],
+        config: Mapping[str, ObjectDefinition],
     ) -> None:
         self._metrics = {}
         for label, conf in config.items():
