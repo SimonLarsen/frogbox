@@ -1,4 +1,4 @@
-from typing import Any, Optional, Sequence, Mapping, Union
+from typing import Any, Optional, Sequence, Mapping, Union, TypeAlias
 from os import PathLike
 from enum import Enum
 from pathlib import Path
@@ -93,7 +93,7 @@ class CheckpointDefinition(StrictModel):
     mode: CheckpointMode = CheckpointMode.MAX
 
 
-ObjectArgument = Union["ObjectDefinition", Any]
+ObjectArgument: TypeAlias = Union["ObjectDefinition", Any]
 
 
 class ObjectDefinition(StrictModel):
@@ -280,9 +280,9 @@ class SupervisedConfig(Config):
         return v
 
 
-def _guess_config_type(path: str | PathLike) -> str:
+def _guess_config_format(path: str | PathLike) -> str:
     """
-    Guess file type based on filename.
+    Guess file format based on filename.
     """
     path = str(path).lower()
     for filetype, exts in _CONFIG_TYPE_EXTENSIONS.items():
@@ -292,12 +292,12 @@ def _guess_config_type(path: str | PathLike) -> str:
             for jinja_ext in _JINJA_EXTENSIONS:
                 if path.endswith(ext + jinja_ext):
                     return filetype
-    raise ValueError(f"Cannot guess filetype of file {path}.")
+    raise ValueError(f"Cannot guess format of file {path}.")
 
 
 def read_config(
     path: str | PathLike,
-    type: Optional[str] = None,
+    format: Optional[str] = None,
     config_vars: Optional[Mapping[str, str]] = None,
 ) -> Config:
     """
@@ -307,20 +307,20 @@ def read_config(
     ----------
     path : str or path-like
         Path to JSON config file.
-    type: str
-        File type to read.
-        If not provided, type will be inferred from filename.
+    format : str
+        File format to read.
+        If not provided, format will be inferred from filename.
     config_kwargs : str-to-str mapping
         Keyword arguments to pass to jinja2.
     """
     if config_vars is None:
         config_vars = {}
 
-    if type is not None:
-        type = type.lower()
-        assert type in ("json", "yaml")
+    if format is not None:
+        format = format.lower()
+        assert format in ("json", "yaml")
     else:
-        type = _guess_config_type(path)
+        format = _guess_config_format(path)
 
     # Read template
     path = Path(path)
@@ -329,7 +329,7 @@ def read_config(
 
     # Parse template
     data = template.render(config_vars)
-    if type == "json":
+    if format == "json":
         config = json.loads(data)
     else:
         config = yaml.safe_load(data)

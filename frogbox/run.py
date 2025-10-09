@@ -40,6 +40,12 @@ def _validate_checkpoint_keys(ctx, param, values) -> Sequence[str]:
     help="Config file.",
 )
 @click.option(
+    "--config-format",
+    "-f",
+    type=click.Choice(["yaml", "json"]),
+    help="Config file format.",
+)
+@click.option(
     "--checkpoint",
     type=Path,
     help="Path to checkpoint.",
@@ -62,6 +68,7 @@ def _validate_checkpoint_keys(ctx, param, values) -> Sequence[str]:
 )
 def run(
     config: Path,
+    config_format: Optional[str] = None,
     checkpoint: Optional[Path] = None,
     checkpoint_keys: Optional[Sequence[str]] = None,
     config_vars: Optional[Mapping[str, str]] = None,
@@ -73,7 +80,12 @@ def run(
     if checkpoint_keys is not None and len(checkpoint_keys) == 0:
         checkpoint_keys = None
 
-    cfg = read_config(config, config_vars=config_vars)
+    cfg = read_config(
+        path=config,
+        format=config_format,
+        config_vars=config_vars,
+    )
+
     if cfg.type == "supervised":
         cfg = cast(SupervisedConfig, cfg)
         pipeline = SupervisedPipeline(

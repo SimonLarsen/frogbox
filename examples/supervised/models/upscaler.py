@@ -52,11 +52,11 @@ class Upscaler(nn.Module):
 
         self.conv_in = nn.Conv2d(3, hidden_channels, 3, 1, 1)
 
-        self.blocks = nn.Sequential()
+        self.blocks = nn.ModuleList()
         for _ in range(num_layers):
             self.blocks.append(ResidualBlock(hidden_channels))
 
-        self.upsample = nn.Sequential()
+        self.upsample = nn.ModuleList()
         for _ in range(int(math.log2(scale_factor))):
             self.upsample.append(Upsample(hidden_channels))
 
@@ -69,8 +69,10 @@ class Upscaler(nn.Module):
 
     def forward(self, x):
         h = self.conv_in(x)
-        h = self.blocks(h)
-        h = self.upsample(h)
+        for block in self.blocks:
+            h = block(h)
+        for block in self.upsample:
+            h = block(h)
         h = self.readout(h)
         x = interpolate(x, h.shape[-2:], mode="bilinear")
         return x + h

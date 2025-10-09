@@ -32,7 +32,7 @@ def project():
     "format_",
     type=click.Choice(["yaml", "json"]),
     default="yaml",
-    help="Config file type.",
+    help="Config file format.",
 )
 @click.option(
     "--dir",
