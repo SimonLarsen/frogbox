@@ -17,15 +17,16 @@ import jinja2
 from .engines.events import EventStep, Event, MatchableEvent
 
 
-CONFIG_TYPE_EXTENSIONS: Mapping[str, Sequence[str]] = {
+_CONFIG_TYPE_EXTENSIONS: Mapping[str, Sequence[str]] = {
     "json": (".js", ".json"),
     "yaml": (".yml", ".yaml"),
 }
 
-JINJA_EXTENSIONS: Sequence[str] = (".jinja", ".jinja2", ".j2")
+_JINJA_EXTENSIONS: Sequence[str] = (".jinja", ".jinja2", ".j2")
 
 
 class StrictModel(BaseModel):
+    """@private"""
     model_config = ConfigDict(extra="forbid")
 
 
@@ -153,7 +154,7 @@ class OptimizerDefinition(ObjectDefinition):
     """
 
     class_name: str = "torch.optim.AdamW"
-    kwargs: Mapping[str, ObjectArgument] = {"lr": 1e-3}
+    kwargs: Optional[Mapping[str, ObjectArgument]] = {"lr": 1e-3}
     target: Optional[str] = None
     scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
 
@@ -284,11 +285,11 @@ def _guess_config_type(path: str | PathLike) -> str:
     Guess file type based on filename.
     """
     path = str(path).lower()
-    for filetype, exts in CONFIG_TYPE_EXTENSIONS.items():
+    for filetype, exts in _CONFIG_TYPE_EXTENSIONS.items():
         for ext in exts:
             if path.endswith(ext):
                 return filetype
-            for jinja_ext in JINJA_EXTENSIONS:
+            for jinja_ext in _JINJA_EXTENSIONS:
                 if path.endswith(ext + jinja_ext):
                     return filetype
     raise ValueError(f"Cannot guess filetype of file {path}.")

@@ -1,4 +1,4 @@
-from typing import cast, Mapping, Optional
+from typing import cast, Mapping, Optional, Sequence
 from pathlib import Path
 import click
 from frogbox.config import read_config
@@ -18,6 +18,14 @@ def _validate_vars(ctx, param, values) -> Mapping[str, str]:
     return out
 
 
+def _validate_checkpoint_keys(ctx, param, values) -> Sequence[str]:
+    out = []
+    for value in values:
+        for key in value.split(","):
+            out.append(key.strip())
+    return out
+
+
 @click.command()
 @click.option(
     "--config",
@@ -28,7 +36,20 @@ def _validate_vars(ctx, param, values) -> Mapping[str, str]:
         dir_okay=False,
         path_type=Path,
     ),
+    required=True,
     help="Config file.",
+)
+@click.option(
+    "--checkpoint",
+    type=Path,
+    help="Path to checkpoint.",
+)
+@click.option(
+    "--checkpoint-keys",
+    type=str,
+    multiple=True,
+    callback=_validate_checkpoint_keys,
+    help="Keys in checkpoint to load. Uses all keys if not provided.",
 )
 @click.option(
     "--var",
@@ -37,19 +58,30 @@ def _validate_vars(ctx, param, values) -> Mapping[str, str]:
     type=str,
     multiple=True,
     callback=_validate_vars,
+    help="Set config parser variable.",
 )
 def run(
     config: Path,
+    checkpoint: Optional[Path] = None,
+    checkpoint_keys: Optional[Sequence[str]] = None,
     config_vars: Optional[Mapping[str, str]] = None,
     **kwargs,
 ) -> Pipeline:
     if config_vars is None:
         config_vars = {}
 
+    if checkpoint_keys is not None and len(checkpoint_keys) == 0:
+        checkpoint_keys = None
+
     cfg = read_config(config, config_vars=config_vars)
     if cfg.type == "supervised":
         cfg = cast(SupervisedConfig, cfg)
-        pipeline = SupervisedPipeline(cfg, **kwargs)
+        pipeline = SupervisedPipeline(
+            config=cfg,
+            checkpoint=checkpoint,
+            checkpoint_keys=checkpoint_keys,
+            **kwargs,
+        )
     else:
         raise RuntimeError(f'Unknown config type "{cfg.type}".')
     pipeline.run()

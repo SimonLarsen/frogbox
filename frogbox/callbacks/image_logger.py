@@ -11,7 +11,7 @@ import tqdm
 import wandb
 from .callback import Callback
 from ..pipelines.pipeline import Pipeline
-from ..utils import convert_tensor
+from ..tensor_utils import convert_tensor
 
 
 def _default_forward(x: Any, y: Any, model: Callable) -> Tuple[Any, ...]:

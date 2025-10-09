@@ -70,6 +70,7 @@ class Pipeline(ABC):
         checkpoint: Optional[str | PathLike] = None,
         checkpoint_keys: Optional[Sequence[str]] = None,
     ):
+        """Create base pipeline."""
         self.config = config
 
         # Create accelerator
