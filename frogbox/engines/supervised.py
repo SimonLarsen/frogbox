@@ -1,106 +1,107 @@
-from typing import Callable, Any, Optional
+from typing import Callable, Any, Optional, Tuple, Mapping
 import torch
+from torch.optim.lr_scheduler import LRScheduler
 from accelerate import Accelerator
-from .engine import Engine
+from .engine import Trainer, Evaluator
 
 
-class SupervisedTrainer(Engine):
+def _default_forward(x: Any, y: Any, model: Callable) -> Tuple[Any, Any]:
+    return y, model(x)
+
+
+class SupervisedTrainer(Trainer):
     def __init__(
         self,
-        accelerator: Accelerator,
         model: torch.nn.Module,
+        optimizers: Mapping[str, torch.optim.Optimizer],
+        schedulers: Mapping[str, LRScheduler],
         loss_fn: Callable[[Any, Any], Any],
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler.LRScheduler,
+        forward: Optional[
+            Callable[[Any, Any, Callable], Tuple[Any, Any]]
+        ] = None,
         clip_grad_norm: Optional[float] = None,
         clip_grad_value: Optional[float] = None,
-        input_transform: Callable[[Any, Any], Any] = lambda x, y: (x, y),
-        model_transform: Callable[[Any], Any] = lambda output: output,
-        output_transform: Callable[
-            [Any, Any, Any, Any], Any
-        ] = lambda x, y, y_pred, loss: loss.item(),
-        **kwargs,
     ):
-        self.accelerator = accelerator
+        if forward is None:
+            forward = _default_forward
+
         self.model = model
+        self.optimizers = optimizers
+        self.schedulers = schedulers
         self.loss_fn = loss_fn
-        self.optimizer = optimizer
-        self.scheduler = scheduler
+        self.forward = forward
 
         self.clip_grad_norm = clip_grad_norm
         self.clip_grad_value = clip_grad_value
 
-        self._input_transform = input_transform
-        self._model_transform = model_transform
-        self._output_transform = output_transform
+        super().__init__(process_fn=self.process)
 
-        super().__init__(process_fn=self.process, **kwargs)
-
-    def process(self, batch):
+    def process(
+        self,
+        accelerator: Accelerator,
+        batch: Tuple[Any, Any],
+    ):
         self.model.train()
 
-        inputs, targets = batch
-        inputs, targets = self._input_transform(inputs, targets)
+        x, y = batch
 
-        with self.accelerator.accumulate(self.model):
-            self.optimizer.zero_grad()
-            outputs = self._model_transform(self.model(inputs))
+        with accelerator.accumulate(self.model):
+            for optimizer in self.optimizers.values():
+                optimizer.zero_grad()
 
-            loss = self.loss_fn(outputs, targets)
-            self.accelerator.backward(loss)
+            y, y_pred = self.forward(x, y, self.model)
 
-            if self.accelerator.sync_gradients:
+            loss = self.loss_fn(y_pred, y)
+            accelerator.backward(loss)
+
+            if accelerator.sync_gradients:
                 if self.clip_grad_norm:
-                    self.accelerator.clip_grad_norm_(
+                    accelerator.clip_grad_norm_(
                         parameters=self.model.parameters(),
                         max_norm=self.clip_grad_norm,
                     )
                 if self.clip_grad_value:
-                    self.accelerator.clip_grad_value_(
+                    accelerator.clip_grad_value_(
                         parameters=self.model.parameters(),
                         clip_value=self.clip_grad_value,
                     )
 
-            self.optimizer.step()
-            self.scheduler.step()
+            for optimizer in self.optimizers.values():
+                optimizer.step()
 
-        return self._output_transform(inputs, targets, outputs, loss)
+            for scheduler in self.schedulers.values():
+                scheduler.step()
+
+        return loss.item()
 
 
-class SupervisedEvaluator(Engine):
+class SupervisedEvaluator(Evaluator):
     def __init__(
         self,
-        accelerator: Accelerator,
         model: torch.nn.Module,
-        input_transform: Callable[[Any, Any], Any] = lambda x, y: (x, y),
-        model_transform: Callable[[Any], Any] = lambda output: output,
-        output_transform: Callable[
-            [Any, Any, Any], Any
-        ] = lambda x, y, y_pred: (y_pred, y),
-        **kwargs,
+        forward: Optional[
+            Callable[[Any, Any, Callable], Tuple[Any, Any]]
+        ] = None,
     ):
-        self.accelerator = accelerator
+        if forward is None:
+            forward = _default_forward
+
         self.model = model
+        self.forward = forward
 
-        self._input_transform = input_transform
-        self._model_transform = model_transform
-        self._output_transform = output_transform
+        super().__init__(process_fn=self.process)
 
-        super().__init__(process_fn=self.process, **kwargs)
-
-    def process(self, batch):
+    def process(
+        self,
+        accelerator: Accelerator,
+        batch: Tuple[Any, Any],
+    ):
         self.model.eval()
 
-        inputs, targets = batch
-        inputs, targets = self._input_transform(inputs, targets)
+        x, y = batch
 
         with torch.no_grad():
-            outputs = self._model_transform(self.model(inputs))
+            y, y_pred = self.forward(x, y, self.model)
 
-        outputs, targets = self._output_transform(inputs, targets, outputs)
-
-        outputs, targets = self.accelerator.gather_for_metrics(
-            (outputs, targets)
-        )
-
-        return outputs, targets
+        y_pred, y = accelerator.gather_for_metrics((y_pred, y))
+        return y_pred, y

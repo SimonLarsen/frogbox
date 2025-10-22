@@ -1,15 +1,32 @@
-from typing import Dict, Any, Optional, Sequence
+from typing import Any, Optional, Sequence, Mapping, Union, TypeAlias
 from os import PathLike
 from enum import Enum
 from pathlib import Path
+from functools import partial
 import json
+import yaml
 from importlib import import_module
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 import jinja2
 from .engines.events import EventStep, Event, MatchableEvent
 
 
+_CONFIG_TYPE_EXTENSIONS: Mapping[str, Sequence[str]] = {
+    "json": (".js", ".json"),
+    "yaml": (".yml", ".yaml"),
+}
+
+_JINJA_EXTENSIONS: Sequence[str] = (".jinja", ".jinja2", ".j2")
+
+
 class StrictModel(BaseModel):
+    """@private"""
     model_config = ConfigDict(extra="forbid")
 
 
@@ -17,7 +34,11 @@ class ConfigType(str, Enum):
     """Pipeline configuration type."""
 
     SUPERVISED = "supervised"
-    GAN = "gan"
+
+
+class EngineType(str, Enum):
+    TRAINER = "trainer"
+    EVALUATOR = "evaluator"
 
 
 class LogInterval(StrictModel):
@@ -56,49 +77,39 @@ class CheckpointDefinition(StrictModel):
 
     Attributes
     ----------
+    interval : EventStep or LogInterval
+        Interval between saving checkpoints.
+    num_saved : int
+        Number of checkpoints to save.
     metric : str
         Name of metric to compare (optional).
     mode : CheckpointMode
         Whether to priority maximum or minimum metric value.
-    num_saved : int
-        Number of checkpoints to save.
-    interval : EventStep or LogInterval
-        Interval between saving checkpoints.
     """
 
+    interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
+    num_saved: int = Field(default=3, ge=1)
     metric: Optional[str] = None
     mode: CheckpointMode = CheckpointMode.MAX
-    num_saved: int = Field(default=3, ge=1)
-    interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
+
+
+ObjectArgument: TypeAlias = Union["ObjectDefinition", Any]
 
 
 class ObjectDefinition(StrictModel):
-    """
-    Object instance definition.
+    object: Optional[str] = None
+    function: Optional[str] = None
+    args: Optional[Sequence[ObjectArgument]] = None
+    kwargs: Optional[Mapping[str, ObjectArgument]] = None
 
-    Attributes
-    ----------
-    class_name : str
-        Class path string. Example: `torch.optim.AdamW`.
-    params : dict
-        Dictionary of parameters to pass object constructor.
-    """
-
-    class_name: str
-    params: Dict[str, Any] = dict()
-
-
-class LossDefinition(ObjectDefinition):
-    """
-    Loss function definition
-
-    Attributes
-    ----------
-    weight : float
-        Loss function weight.
-    """
-
-    weight: float = 1.0
+    @model_validator(mode="after")
+    def verify_object_or_function(self) -> "ObjectDefinition":
+        if self.object is not None and self.function is not None:
+            raise ValueError(
+                "Object definition should only have either"
+                ' "object" or "function" field.'
+            )
+        return self
 
 
 class SchedulerType(str, Enum):
@@ -137,6 +148,49 @@ class LRSchedulerDefinition(StrictModel):
     warmup_steps: int = Field(default=0, ge=0)
 
 
+class OptimizerDefinition(ObjectDefinition):
+    """
+    Optimizer definition.
+    """
+
+    class_name: str = "torch.optim.AdamW"
+    kwargs: Optional[Mapping[str, ObjectArgument]] = {"lr": 1e-3}
+    target: Optional[str] = None
+    scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
+
+
+class ModelDefinition(ObjectDefinition):
+    """
+    Model definition.
+    """
+
+    optimizers: Mapping[str, OptimizerDefinition] = {
+        "default": OptimizerDefinition()
+    }
+
+
+class LossDefinition(ObjectDefinition):
+    """
+    Loss function definition
+
+    Attributes
+    ----------
+    weight : float
+        Loss function weight.
+    """
+
+    weight: float = 1.0
+
+
+class CallbackDefinition(ObjectDefinition):
+    """
+    Callback definition.
+    """
+
+    interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
+    engine: EngineType = EngineType.TRAINER
+
+
 class Config(StrictModel):
     """
     Base configuration.
@@ -149,20 +203,6 @@ class Config(StrictModel):
         Project name.
     log_interval : EventStep or LogInterval
         At which interval to log metrics.
-    """
-
-    type: ConfigType
-    project: str
-    meta: Dict[str, Any] = dict()
-    log_interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
-
-
-class SupervisedConfig(Config):
-    """
-    Supervised pipeline configuration.
-
-    Attributes
-    ----------
     batch_size : int
         Batch size.
     loader_workers : int
@@ -170,35 +210,24 @@ class SupervisedConfig(Config):
         `0` means the data will be loaded in the main process.
     max_epochs : int
         Maximum number of epochs to train for.
-    clip_grad_norm : float
-        Clip gradients to norm if provided.
-    clip_grad_norm : float
-        Clip gradients to value if provided.
     gradient_accumulation_steps : int
         Number of steps the gradients should be accumulated across.
-    datasets : dict of ObjectDefinition
+    checkpoints : list of CheckpointDefinition
+    datasets : dict of ClassDefinition
         Dataset definitions.
-    loaders : dict of ObjectDefinition
+    loaders : dict of ClassDefinition
         Data loader definitions.
-    model : ObjectDefinition
-        Model definition.
-    losses : dict of LossDefinition
-        Loss functions.
-    metrics : dict of ObjectDefinition
+    metrics : dict of ClassDefinition
         Evaluation metrics.
-    optimizer : ObjectDefinition
-        Torch optimizer.
-    lr_scheduler : LRSchedulerDefinition
-        Learning rate scheduler.
     """
 
+    type: ConfigType
+    project: str
+    log_interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
     batch_size: int = Field(default=32, ge=1)
     loader_workers: int = Field(default=0, ge=0)
     max_epochs: int = Field(default=50, ge=1)
-    clip_grad_norm: Optional[float] = None
-    clip_grad_value: Optional[float] = None
     gradient_accumulation_steps: int = Field(default=1, ge=1)
-    metrics: Dict[str, ObjectDefinition] = dict()
     checkpoints: Sequence[CheckpointDefinition] = (
         (
             CheckpointDefinition(
@@ -208,15 +237,41 @@ class SupervisedConfig(Config):
             )
         ),
     )
-    model: ObjectDefinition
-    losses: Dict[str, LossDefinition] = dict()
-    datasets: Dict[str, ObjectDefinition]
-    loaders: Dict[str, ObjectDefinition] = dict()
-    optimizer: ObjectDefinition = ObjectDefinition(
-        class_name="torch.optim.AdamW",
-        params={"lr": 1e-3},
-    )
-    lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
+    datasets: Mapping[str, ObjectDefinition]
+    loaders: Mapping[str, ObjectDefinition] = {}
+    metrics: Mapping[str, ObjectDefinition] = {}
+    callbacks: Sequence[CallbackDefinition] = []
+
+    @field_validator("datasets")
+    @classmethod
+    def check_datasets(cls, v: Mapping[str, ObjectDefinition]):
+        assert "train" in v, 'datasets must contain key "train".'
+        return v
+
+
+class SupervisedConfig(Config):
+    """
+    Supervised pipeline configuration.
+
+    Attributes
+    ----------
+    clip_grad_norm : float
+        Clip gradients to norm if provided.
+    clip_grad_norm : float
+        Clip gradients to value if provided.
+    model : ModelDefinition
+        Model definition.
+    losses : dict of LossDefinition
+        Loss functions.
+    """
+
+    type: ConfigType = Field(default=ConfigType.SUPERVISED, frozen=True)
+    clip_grad_norm: Optional[float] = None
+    clip_grad_value: Optional[float] = None
+    model: ModelDefinition
+    losses: Mapping[str, LossDefinition] = {}
+    trainer_forward: Optional[ObjectDefinition] = None
+    evaluator_forward: Optional[ObjectDefinition] = None
 
     @field_validator("type")
     @classmethod
@@ -224,81 +279,65 @@ class SupervisedConfig(Config):
         assert v == ConfigType.SUPERVISED
         return v
 
-    @field_validator("datasets")
-    @classmethod
-    def check_datasets(cls, v: Dict[str, ObjectDefinition]):
-        assert "train" in v, 'datasets must contain key "train".'
-        return v
 
-
-class GANConfig(SupervisedConfig):
+def _guess_config_format(path: str | PathLike) -> str:
     """
-    GAN pipeline configuration.
-
-    Attributes
-    ----------
-    disc_model : ObjectDefinition
-        Discriminator model definition.
-    disc_losses: dict of LossDefinition
-        Discriminator loss functions.
-    disc_optimizer : ObjectDefinition
-        Discriminator Torch optimizer.
-    disc_lr_scheduler : LRSchedulerDefinition
-        Discriminator learning rate scheduler.
+    Guess file format based on filename.
     """
-
-    disc_model: ObjectDefinition
-    disc_losses: Dict[str, LossDefinition] = dict()
-    disc_optimizer: ObjectDefinition = ObjectDefinition(
-        class_name="torch.optim.AdamW",
-        params={"lr": 1e-3},
-    )
-    disc_lr_scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
-
-    @field_validator("type")
-    @classmethod
-    def check_type(cls, v: ConfigType) -> ConfigType:
-        assert v == ConfigType.GAN
-        return v
+    path = str(path).lower()
+    for filetype, exts in _CONFIG_TYPE_EXTENSIONS.items():
+        for ext in exts:
+            if path.endswith(ext):
+                return filetype
+            for jinja_ext in _JINJA_EXTENSIONS:
+                if path.endswith(ext + jinja_ext):
+                    return filetype
+    raise ValueError(f"Cannot guess format of file {path}.")
 
 
-def read_json_config(
+def read_config(
     path: str | PathLike,
-    *args: str,
-    **kwargs: str,
+    format: Optional[str] = None,
+    config_vars: Optional[Mapping[str, str]] = None,
 ) -> Config:
     """
-    Read and render JSON config file and render using jinja2.
+    Read and render config file using jinja2.
 
     Parameters
     ----------
     path : str or path-like
         Path to JSON config file.
-    args : sequence of strings
-        Arguments to pass to jinja2 to in form of "key=value".
-    kwargs : str-to-str mapping
+    format : str
+        File format to read.
+        If not provided, format will be inferred from filename.
+    config_kwargs : str-to-str mapping
         Keyword arguments to pass to jinja2.
     """
-    # Parse template arguments
-    template_args = {}
-    for arg in args:
-        pos = arg.find("=")
-        assert pos >= 1
-        template_args[arg[:pos]] = arg[pos+1:]
-    template_args.update(kwargs)
+    if config_vars is None:
+        config_vars = {}
 
-    # Read JSON template
+    if format is not None:
+        format = format.lower()
+        assert format in ("json", "yaml")
+    else:
+        format = _guess_config_format(path)
+
+    # Read template
     path = Path(path)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(path.parent)))
     template = env.get_template(str(path.relative_to(path.parent)))
 
-    # Render config and validate
-    config = json.loads(template.render(template_args))
+    # Parse template
+    data = template.render(config_vars)
+    if format == "json":
+        config = json.loads(data)
+    else:
+        config = yaml.safe_load(data)
+
+    # Validate config object
     assert "type" in config
     if config["type"] == "supervised":
         return SupervisedConfig.model_validate(config)
-    if config["type"] == "gan":
-        return GANConfig.model_validate(config)
     raise RuntimeError(f"Unknown config type {config['type']}.")
 
 
@@ -318,7 +357,7 @@ def parse_log_interval(e: str | LogInterval) -> MatchableEvent:
     raise ValueError(f"Cannot parse log interval {e}.")
 
 
-def _get_class(path: str) -> Any:
+def _get_module(path: str) -> Any:
     """
     Get class from import path.
 
@@ -334,7 +373,11 @@ def _get_class(path: str) -> Any:
     return getattr(module, class_name)
 
 
-def create_object_from_config(config: ObjectDefinition, **kwargs) -> Any:
+def create_object_from_config(
+    config: ObjectDefinition,
+    *additional_args: Any,
+    **additional_kwargs: Any,
+) -> Any:
     """
     Create object from dictionary configuration.
     Dictionary should have a ``class`` entry and an optional ``params`` entry.
@@ -344,7 +387,29 @@ def create_object_from_config(config: ObjectDefinition, **kwargs) -> Any:
     >>> config = {"class": "torch.optim.Adam", "params": {"lr": 1e-5}}
     >>> optimizer = create_object_from_config(config)
     """
-    obj_class = _get_class(config.class_name)
-    params = dict(kwargs)
-    params.update(config.params)
-    return obj_class(**params)
+    # Recursively parse arguments
+    args = []
+    if config.args:
+        for arg in config.args:
+            if isinstance(arg, ObjectDefinition):
+                arg = create_object_from_config(arg)
+            args.append(arg)
+    args.extend(additional_args)
+
+    # Recursively parse keyword arguments
+    kwargs = dict(additional_kwargs)
+    if config.kwargs:
+        for key, value in config.kwargs.items():
+            if isinstance(value, ObjectDefinition):
+                value = create_object_from_config(value)
+            kwargs[key] = value
+
+    if config.object is not None:
+        obj_class = _get_module(config.object)
+        return obj_class(*args, **kwargs)
+
+    if config.function is not None:
+        fun = _get_module(config.function)
+        return partial(fun, *args, **kwargs)
+
+    return RuntimeError("Cannot create object from definition.")

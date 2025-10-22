@@ -1,0 +1,63 @@
+{% set batch_size = batch_size | default(32) -%}
+type: supervised
+project: frogbox-example
+batch_size: {{ batch_size }}
+loader_workers: 4
+max_epochs: 16
+log_interval: epoch_completed
+
+checkpoints:
+- metric: SSIM
+  mode: max
+  num_saved: 1
+
+model:
+  object: models.upscaler.Upscaler
+  kwargs:
+    scale_factor: 2
+    hidden_channels: 32
+    num_layers: 4
+  optimizers:
+    default:
+      object: torch.optim.AdamW
+      kwargs: 
+        lr: 1.0e-3
+      scheduler:
+        end_value: 1.0e-7
+        type: cosine
+
+datasets:
+  train:
+    object: datasets.example.ExampleDataset
+    kwargs:
+      do_augment: true
+      split: train
+  val:
+    object: datasets.example.ExampleDataset
+    kwargs:
+      do_augment: false
+      split: val
+  test:
+    object: datasets.example.ExampleDataset
+    kwargs:
+      do_augment: false
+      split: test
+
+losses:
+  L1:
+    object: torch.nn.L1Loss
+    weight: 1.0
+
+metrics:
+  PSNR:
+    object: torchmetrics.image.PeakSignalNoiseRatio
+    kwargs: 
+      data_range: 1.0
+  SSIM:
+    object: torchmetrics.image.StructuralSimilarityIndexMeasure
+    kwargs:
+      data_range: 1.0
+
+callbacks:
+- object: frogbox.callbacks.ImageLogger
+  interval: epoch_completed

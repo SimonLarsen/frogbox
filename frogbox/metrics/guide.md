@@ -12,8 +12,8 @@ SSIM metric from torchmetrics like this:
   ...
   "metrics": {
     "SSIM": {
-      "class_name": "torchmetrics.image.StructuralSimilarityIndexMeasure",
-      "params": {
+      "object": "torchmetrics.image.StructuralSimilarityIndexMeasure",
+      "kwargs": {
         "data_range": 1.0,
         "kernel_size": 11,
         "sigma": 1.5

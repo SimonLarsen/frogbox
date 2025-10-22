@@ -2,29 +2,44 @@ from typing import (
     Dict,
     Any,
     Optional,
-    Tuple,
     Mapping,
     Sequence,
     Callable,
+    Tuple,
 )
 from os import PathLike
-from abc import ABC, abstractmethod
+from abc import ABC
 import datetime
+import warnings
+from functools import partial
 import torch
 from torch.utils.data import Dataset, DataLoader
+from torch.optim.lr_scheduler import LRScheduler
 from accelerate import Accelerator
-from ..engines.engine import Engine
+from torchmetrics import Metric
+from .name_generation import generate_name
+from ..engines.engine import (
+    Engine,
+    Trainer,
+    Evaluator,
+    TrainerFactory,
+    EvaluatorFactory,
+)
 from ..engines.events import MatchableEvent
 from ..config import (
     Config,
     ObjectDefinition,
+    ModelDefinition,
     LossDefinition,
     parse_log_interval,
     create_object_from_config,
 )
-from ..handlers.checkpoint import Checkpoint
 from .composite_loss import CompositeLoss
-from .name_generation import generate_name
+from .lr_scheduler import create_lr_scheduler
+from ..handlers.checkpoint import Checkpoint
+from ..handlers.composite_loss_logger import CompositeLossLogger
+from ..handlers.optimizer_logger import OptimizerLogger
+from ..handlers.metric_logger import MetricLogger
 
 
 class Pipeline(ABC):
@@ -32,9 +47,139 @@ class Pipeline(ABC):
 
     config: Config
     accelerator: Accelerator
-    trainer: Engine
+    trainer: Trainer
+    evaluator: Evaluator
+
+    _models: Dict[str, torch.nn.Module]
+    _optimizers: Dict[str, Dict[str, torch.optim.Optimizer]]
+    _schedulers: Dict[str, Dict[str, LRScheduler]]
+    _losses: Dict[str, CompositeLoss]
+    _datasets: Dict[str, Dataset]
+    _loaders: Dict[str, DataLoader]
+    _metrics: Dict[str, Metric]
 
     _run_name: Optional[str] = None
+
+    def __init__(
+        self,
+        config: Config,
+        models: Mapping[str, ModelDefinition],
+        losses: Mapping[str, Mapping[str, LossDefinition]],
+        trainer: TrainerFactory,
+        evaluator: EvaluatorFactory,
+        checkpoint: Optional[str | PathLike] = None,
+        checkpoint_keys: Optional[Sequence[str]] = None,
+    ):
+        """Create base pipeline."""
+        self.config = config
+
+        # Create accelerator
+        self.accelerator = Accelerator(
+            gradient_accumulation_steps=config.gradient_accumulation_steps,
+            log_with="wandb",
+        )
+        self.accelerator.init_trackers(
+            project_name=self.config.project,
+            config=self.config.model_dump(),
+            init_kwargs={"wandb": {"name": self.run_name}},
+        )
+
+        self._create_data_loaders(
+            batch_size=config.batch_size,
+            loader_workers=config.loader_workers,
+            datasets=config.datasets,
+            loaders=config.loaders,
+        )
+        self._create_models(models)
+        self._create_losses(losses)
+        self._create_metrics(config.metrics)
+
+        self.trainer = trainer(
+            self._models, self._optimizers, self._schedulers, self._losses
+        )
+        self.evaluator = evaluator(self._models)
+
+        # Log trainer losses
+        for name, loss in self._losses.items():
+            CompositeLossLogger(
+                loss=loss, log_function=self.log, prefix=f"loss/{name}/"
+            ).attach(self.trainer)
+
+        # Log learning rates
+        for name1, optimizer_group in self._optimizers.items():
+            for name2, optimizer in optimizer_group.items():
+                OptimizerLogger(
+                    optimizer=optimizer,
+                    params=["lr"],
+                    log_function=self.log,
+                    prefix=f"optimizer/{name1}/{name2}/",
+                ).attach(self.trainer)
+
+        # Attach evaluator and log metrics
+        if "val" in self._loaders:
+            self.trainer.add_event_handler(
+                event=self.log_interval,
+                function=lambda: self.evaluator.run(
+                    accelerator=self.accelerator,
+                    loader=self._loaders["val"],
+                    progress_label="val",
+                ),
+            )
+
+            MetricLogger(
+                metrics=self._metrics,
+                log_function=self.log,
+                prefix="metrics/",
+            ).attach(self.evaluator)
+        else:
+            warnings.warn(
+                'No "val" dataset provided. Validation will not be performed.'
+            )
+
+        # Create and attach checkpoints
+        to_save, to_unwrap = self._get_checkpoint_dict()
+        output_folder = f"checkpoints/{self.run_name}"
+        for ckpt_cfg in config.checkpoints:
+            score_function = None
+            if ckpt_cfg.metric is not None:
+                score_function = partial(
+                    lambda metric: metric.compute().item(),
+                    metric=self._metrics[ckpt_cfg.metric],
+                )
+
+            checkpoint_handler = Checkpoint(
+                accelerator=self.accelerator,
+                config=self.config,
+                to_save=to_save,
+                output_folder=output_folder,
+                global_step_function=lambda: self.trainer.iteration,
+                score_function=score_function,
+                score_name=ckpt_cfg.metric,
+                score_mode=ckpt_cfg.mode,
+                to_unwrap=to_unwrap,
+                max_saved=ckpt_cfg.num_saved,
+            )
+            self.trainer.add_event_handler(
+                event=parse_log_interval(ckpt_cfg.interval),
+                function=checkpoint_handler,
+            )
+
+        # Load checkpoint
+        if checkpoint is not None:
+            self._load_checkpoint(
+                path=checkpoint,
+                to_load=to_save,
+                to_unwrap=to_unwrap,
+                keys=checkpoint_keys,
+            )
+
+        # Install callbacks
+        for cfg in config.callbacks:
+            self.install_callback(
+                event=parse_log_interval(cfg.interval),
+                callback=create_object_from_config(cfg),
+                engine=cfg.engine,
+            )
 
     def _create_data_loaders(
         self,
@@ -42,34 +187,73 @@ class Pipeline(ABC):
         loader_workers: int,
         datasets: Mapping[str, ObjectDefinition],
         loaders: Optional[Mapping[str, ObjectDefinition]] = None,
-    ) -> Tuple[Dict[str, Dataset], Dict[str, DataLoader]]:
+    ):
         if loaders is None:
             loaders = {}
 
-        out_datasets = {}
-        out_loaders = {}
+        self._datasets = {}
+        self._loaders = {}
 
         with self.accelerator.local_main_process_first():
             for split in datasets.keys():
                 ds = create_object_from_config(datasets[split])
-                out_datasets[split] = ds
+                self._datasets[split] = ds
 
                 if split in loaders:
-                    out_loaders[split] = create_object_from_config(
+                    loader = create_object_from_config(
                         loaders[split],
                         dataset=ds,
                         batch_size=batch_size,
                         num_workers=loader_workers,
                     )
                 else:
-                    out_loaders[split] = DataLoader(
+                    loader = DataLoader(
                         dataset=ds,
                         batch_size=batch_size,
                         num_workers=loader_workers,
                         shuffle=split == "train",
                     )
 
-        return out_datasets, out_loaders
+                loader = self.accelerator.prepare(loader)
+                self._loaders[split] = loader
+
+    def _create_models(self, models: Mapping[str, ModelDefinition]):
+        self._models = {}
+        self._optimizers = {}
+        self._schedulers = {}
+
+        for model_name, model_cfg in models.items():
+            model = create_object_from_config(model_cfg)
+            model = self.accelerator.prepare(model)
+
+            self._models[model_name] = model
+            self._optimizers[model_name] = {}
+            self._schedulers[model_name] = {}
+
+            for optimizer_name, optimizer_cfg in model_cfg.optimizers.items():
+                optimizer = create_object_from_config(
+                    optimizer_cfg,
+                    params=model.parameters(),
+                )
+
+                scheduler = create_lr_scheduler(
+                    optimizer=optimizer,
+                    config=optimizer_cfg.scheduler,
+                    max_iterations=self.max_iterations,
+                )
+
+                optimizer, scheduler = self.accelerator.prepare(
+                    optimizer, scheduler
+                )
+                self._optimizers[model_name][optimizer_name] = optimizer
+                self._schedulers[model_name][optimizer_name] = scheduler
+
+    def _create_losses(
+        self, losses: Mapping[str, Mapping[str, LossDefinition]]
+    ):
+        self._losses = {}
+        for name, cfg in losses.items():
+            self._losses[name] = self._create_composite_loss(cfg)
 
     def _create_composite_loss(
         self,
@@ -89,30 +273,32 @@ class Pipeline(ABC):
             losses=loss_modules,
             weights=loss_weights,
             transforms=transforms,
-        )
-        loss_fn = loss_fn.to(self.device)
+        ).to(self.device)
         return loss_fn
 
-    def _setup_tracking(
+    def _create_metrics(
         self,
-        mode: str,
-        wandb_id: Optional[str] = None,
-        tags: Optional[Sequence[str]] = None,
-        group: Optional[str] = None,
+        config: Mapping[str, ObjectDefinition],
     ) -> None:
-        self.accelerator.init_trackers(
-            project_name=self.config.project,
-            config=self.config.model_dump(),
-            init_kwargs={
-                "wandb": {
-                    "id": wandb_id,
-                    "mode": mode,
-                    "name": self.run_name,
-                    "tags": tags,
-                    "group": group,
-                }
-            },
-        )
+        self._metrics = {}
+        for label, conf in config.items():
+            self._metrics[label] = create_object_from_config(
+                config=conf,
+                sync_on_compute=False,
+            ).to(self.device)
+
+    def _get_checkpoint_dict(self) -> Tuple[Mapping[str, Any], Sequence[str]]:
+        to_save: Dict[str, Any] = {"trainer": self.trainer}
+        to_unwrap = [f"model_{name}" for name in self._models]
+        for name, model in self._models.items():
+            to_save[f"model_{name}"] = model
+        for name1, optimizer_group in self._optimizers.items():
+            for name2, optimizer in optimizer_group.items():
+                to_save[f"optimizer_{name1}_{name2}"] = optimizer
+        for name1, scheduler_group in self._schedulers.items():
+            for name2, scheduler in scheduler_group.items():
+                to_save[f"scheduler_{name1}_{name2}"] = scheduler
+        return to_save, to_unwrap
 
     def _load_checkpoint(
         self,
@@ -181,10 +367,21 @@ class Pipeline(ABC):
 
             target.add_event_handler(event, callback, self, **kwargs)
 
-    @abstractmethod
-    def run(self) -> None: ...
+    def run(self) -> None:
+        """Run pipeline."""
+        try:
+            self.trainer.run(
+                accelerator=self.accelerator,
+                loader=self._loaders["train"],
+                max_epochs=self.config.max_epochs,
+                progress_label="train",
+            )
+        except KeyboardInterrupt:
+            self.print("Interrupted")
+        finally:
+            self.accelerator.end_training()
 
-    def log(self, data: Dict[str, Any]) -> None:
+    def log(self, data: Mapping[str, Any]) -> None:
         """Log data to tracker(s)."""
         self.accelerator.log(data, step=self.trainer.iteration)
 
@@ -232,3 +429,7 @@ class Pipeline(ABC):
     @property
     def log_interval(self) -> MatchableEvent:
         return parse_log_interval(self.config.log_interval)
+
+    @property
+    def max_iterations(self) -> int:
+        return len(self._loaders["train"]) * self.config.max_epochs

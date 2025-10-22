@@ -1,50 +1,4 @@
-"""
-# Logging images
-
-The simplest way to log images during training is to create a callback with
-`frogbox.callbacks.image_logger.ImageLogger`:
-
-```python
-from frogbox import Events
-from frogbox.callbacks import ImageLogger
-
-image_logger = ImageLogger()
-
-pipeline.install_callback(
-    event="epoch_completed",
-    callback=image_logger,
-)
-```
-
-Images can automatically be denormalized by setting `denormalize_input`/`denormalize_output`
-and providing the mean and standard deviation used for normalization.
-
-For instance, if input images are normalized with ImageNet parameters and outputs are in [0, 1]:
-
-```python
-image_logger = ImageLogger(
-    normalize_mean=[0.485, 0.456, 0.406],
-    normalize_std=[0.229, 0.224, 0.225],
-    denormalize_input=True,
-)
-```
-
-More advanced transformations can be made by overriding `input_transform`, `model_transform`, or `output_transform`:
-
-```python
-from torchvision.transforms.functional import hflip
-
-def flip_input(x, y, y_pred):
-    x = hflip(x)
-    return x, y_pred, y
-
-image_logger = ImageLogger(
-    output_transform=flip_input,
-)
-```
-"""  # noqa: E501
-
-from typing import Sequence, Callable, Any, Optional
+from typing import Sequence, Optional, Callable, Any, Tuple
 import torch
 from torchvision.transforms.functional import (
     center_crop,
@@ -57,7 +11,11 @@ import tqdm
 import wandb
 from .callback import Callback
 from ..pipelines.pipeline import Pipeline
-from ..utils import convert_tensor
+from ..tensor_utils import convert_tensor
+
+
+def _default_forward(x: Any, y: Any, model: Callable) -> Tuple[Any, ...]:
+    return x, model(x), y
 
 
 class ImageLogger(Callback):
@@ -66,20 +24,15 @@ class ImageLogger(Callback):
     def __init__(
         self,
         split: str = "test",
-        log_label: str = "test/images",
+        log_label: str = "images",
+        model_key: str = "model",
         resize_to_fit: bool = True,
         interpolation: str | InterpolationMode = "nearest",
         num_cols: Optional[int] = None,
-        denormalize_input: bool = False,
-        denormalize_target: bool = False,
-        normalize_mean: Sequence[float] = (0.0, 0.0, 0.0),
-        normalize_std: Sequence[float] = (1.0, 1.0, 1.0),
         show_progress: bool = False,
-        input_transform: Callable[[Any, Any], Any] = lambda x, y: (x, y),
-        model_transform: Callable[[Any], Any] = lambda output: output,
-        output_transform: Callable[
-            [Any, Any, Any], Any
-        ] = lambda x, y, y_pred: (x, y_pred, y),
+        forward: Optional[
+            Callable[[Any, Any, Callable], Tuple[Any, ...]]
+        ] = None,
     ):
         """
         Create ImageLogger.
@@ -90,74 +43,42 @@ class ImageLogger(Callback):
             Dataset split to evaluate on. Defaults to "test".
         log_label : str
             Label to log images under in Weights & Biases.
+        model_key : str
+            Pipeline model to use for inference.
         resize_to_fit : bool
             If `true` smaller images are resized to fit canvas.
         interpolation : torchvision.transforms.functional.InterpolationMode
             Interpolation to use for resizing images.
+        forward : callable
+            Function that arguments `x`, `y` and `model` and tuple of images
+            to log. Returns `(x, model(x), y)` if not provided.
+        show_progress : bool
+            Show progress bar.
         num_cols : int
             Number of columns in image grid.
             Defaults to number of elements in returned tuple.
-        denormalize_input : bool
-            If `true` input images (x) a denormalized after inference.
-        denormalize_target : bool
-            If `true` target images (y and y_pred) are denormalized after
-            inference.
-        normalize_mean : (float, float, float)
-            RGB mean values used in image normalization.
-        normalize_std : (float, float, float)
-            RGB std.dev. values used in image normalization.
-        show_progress : bool
-            Show progress bar.
-        input_transform : Callable
-            Function that receives tensors `y` and `y` and outputs tuple of
-            tensors `(x, y)`.
-        model_transform : Callable
-            Function that receives the output from the model during evaluation
-            and converts it into the predictions:
-            `y_pred = model_transform(model(x))`.
-        output_transform : Callable
-            Function that receives `x`, `y`, `y_pred` and returns tensors to be
-            logged as images. Default is returning `(x, y_pred, y)`.
         """
-        self._split = split
-        self._log_label = log_label
-        self._resize_to_fit = resize_to_fit
-        self._interpolation = InterpolationMode(interpolation)
-        self._num_cols = num_cols
-        self._denormalize_input = denormalize_input
-        self._denormalize_target = denormalize_target
-        self._normalize_mean = normalize_mean
-        self._normalize_std = normalize_std
-        self._show_progress = show_progress
-        self._input_transform = input_transform
-        self._model_transform = model_transform
-        self._output_transform = output_transform
+        if forward is None:
+            forward = _default_forward
 
-    def _denormalize(self, x: torch.Tensor) -> torch.Tensor:
-        mean = torch.as_tensor(
-            self._normalize_mean, device=x.device, dtype=x.dtype
-        ).reshape(1, -1, 1, 1)
-
-        std = torch.as_tensor(
-            self._normalize_std, device=x.device, dtype=x.dtype
-        ).reshape(1, -1, 1, 1)
-
-        return (x * std) + mean
+        self.split = split
+        self.log_label = log_label
+        self.model_key = model_key
+        self.resize_to_fit = resize_to_fit
+        self.interpolation = InterpolationMode(interpolation)
+        self.forward = forward
+        self.show_progress = show_progress
+        self.num_cols = num_cols
 
     def __call__(self, pipeline: Pipeline) -> None:
-        if not hasattr(pipeline, "model") or not hasattr(pipeline, "loaders"):
-            raise RuntimeError(
-                f"ImageLogger not compatible with pipeline {pipeline}."
-            )
-
-        model = pipeline.model
-        loaders = pipeline.loaders
+        model = pipeline._models[self.model_key]
+        loader = pipeline._loaders[self.split]
         accelerator = pipeline.accelerator
 
         model.eval()
 
-        data_iter = loaders[self._split]
-        if self._show_progress:
+        data_iter = loader
+        if self.show_progress:
             data_iter = tqdm.tqdm(
                 data_iter,
                 desc="Images",
@@ -169,33 +90,23 @@ class ImageLogger(Callback):
         images = []
         for batch in data_iter:
             x, y = batch
-            x, y = self._input_transform(x, y)
 
             with torch.inference_mode():
-                y_pred = self._model_transform(model(x))
+                outputs = self.forward(x, y, model)
 
-            x, y, y_pred = accelerator.gather_for_metrics((x, y, y_pred))
+            outputs = accelerator.gather_for_metrics(outputs)
 
-            x = convert_tensor(x, device=torch.device("cpu"))
-            y = convert_tensor(y, device=torch.device("cpu"))
-            y_pred = convert_tensor(y_pred, device=torch.device("cpu"))
-
-            if self._denormalize_input:
-                x = self._denormalize(x)
-            if self._denormalize_target:
-                y = self._denormalize(y)
-                y_pred = self._denormalize(y_pred)
-
-            output = self._output_transform(x, y, y_pred)
-
-            batch_sizes = [len(e) for e in output]
+            outputs = tuple(
+                convert_tensor(e, torch.device("cpu")) for e in outputs
+            )
+            batch_sizes = [len(e) for e in outputs]
             assert all(s == batch_sizes[0] for s in batch_sizes)
             for i in range(batch_sizes[0]):
-                grid = self._combine_test_images([e[i] for e in output])
+                grid = self._combine_test_images([e[i] for e in outputs])
                 images.append(grid)
 
         wandb_images = [wandb.Image(to_pil_image(image)) for image in images]
-        pipeline.log({self._log_label: wandb_images})
+        pipeline.log({self.log_label: wandb_images})
 
     def _combine_test_images(
         self, images: Sequence[torch.Tensor]
@@ -211,14 +122,14 @@ class ImageLogger(Callback):
         for image in images:
             c, h, w = image.shape
             if (h, w) != (max_h, max_w):
-                if self._resize_to_fit:
+                if self.resize_to_fit:
                     image = resize(
                         image,
-                        size=(max_h, max_w),
-                        interpolation=self._interpolation,
+                        size=[max_h, max_w],
+                        interpolation=self.interpolation,
                     )
                 else:
-                    image = center_crop(image, output_size=(max_h, max_w))
+                    image = center_crop(image, output_size=[max_h, max_w])
             if c == 1:
                 image = image.repeat((3, 1, 1))
             image = image.clamp(0.0, 1.0)
@@ -227,5 +138,5 @@ class ImageLogger(Callback):
         return make_grid(
             tensor=transformed,
             normalize=False,
-            nrow=self._num_cols or len(transformed),
+            nrow=self.num_cols or len(transformed),
         )

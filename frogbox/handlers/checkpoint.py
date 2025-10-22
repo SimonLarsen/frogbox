@@ -13,11 +13,37 @@ from pathlib import Path
 from collections import namedtuple
 import torch
 from accelerate import Accelerator
-from accelerate.utils.other import is_compiled_module
 from ..config import Config
 
 
 SavedCheckpoint = namedtuple("SavedCheckpoint", ["filename", "priority"])
+
+
+def _fixed_compiled_model_keys(
+    state_dict: Mapping[str, torch.Tensor]
+) -> Mapping[str, torch.Tensor]:
+    fixed = {}
+    for key, value in state_dict.items():
+        key = key.replace("._orig_mod", "")
+        fixed[key] = value
+    return fixed
+
+
+def _map_state_dict_to_compiled_model(
+    state_dict: Mapping[str, torch.Tensor],
+    model: torch.nn.Module,
+) -> Mapping[str, torch.Tensor]:
+    key_map = {
+        key.replace("._orig_mod", ""): key
+        for key in model.state_dict().keys()
+    }
+
+    fixed = {
+        key_map[key]: value
+        for key, value
+        in state_dict.items()
+    }
+    return fixed
 
 
 class Checkpoint:
@@ -93,9 +119,9 @@ class Checkpoint:
         for key, obj in self._to_save.items():
             if key in self._to_unwrap:
                 obj = self._accelerator.unwrap_model(obj)
-                if is_compiled_module(obj):
-                    obj = obj._orig_mod
-            state_dicts[key] = obj.state_dict()
+                state_dicts[key] = _fixed_compiled_model_keys(obj.state_dict())
+            else:
+                state_dicts[key] = obj.state_dict()
 
         torch.save(state_dicts, filename)
 
@@ -152,10 +178,14 @@ class Checkpoint:
         for key, obj in to_load.items():
             if key in to_unwrap:
                 obj = accelerator.unwrap_model(obj)
-                if is_compiled_module(obj):
-                    obj = obj._orig_mod
-
-            obj.load_state_dict(ckpt[key])
+                obj.load_state_dict(
+                    _map_state_dict_to_compiled_model(
+                        state_dict=ckpt[key],
+                        model=obj,
+                    )
+                )
+            else:
+                obj.load_state_dict(ckpt[key])
 
     def state_dict(self) -> Dict[str, Any]:
         saved = list(map(tuple, self._saved))

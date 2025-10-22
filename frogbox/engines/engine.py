@@ -8,29 +8,29 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Tuple,
 )
 import tqdm
+import torch
+from accelerate import Accelerator
 from .events import EventStep, MatchableEvent, Event
+from ..pipelines.composite_loss import CompositeLoss
 
 
 class SizedIterable(Protocol):
     def __len__(self) -> int:
-        pass
+        ...
 
     def __iter__(self) -> Iterator:
-        pass
+        ...
 
 
 class Engine:
     def __init__(
         self,
-        process_fn: Callable,
-        show_progress: bool = True,
-        progress_label: Optional[str] = None,
+        process_fn: Callable[[Accelerator, Tuple[Any, Any]], Any],
     ):
         self.process_fn = process_fn
-        self.show_progress = show_progress
-        self.progress_label = progress_label
 
         self.epoch = 0
         self.iteration = 0
@@ -57,12 +57,12 @@ class Engine:
         for handler in self.output_handlers:
             handler.function(output)
 
-    def _get_progress_label(self) -> str:
+    def _get_progress_label(self, prefix: Optional[str] = None) -> str:
         label = ""
         if self.max_epochs > 1:
             label += f"[{self.epoch+1}/{self.max_epochs}]"
-        if self.progress_label is not None and len(self.progress_label) > 0:
-            label = self.progress_label + " " + label
+        if prefix is not None and len(prefix) > 0:
+            label = prefix + " " + label
         return label
 
     def _get_data_iterator(self, loader: SizedIterable) -> Iterator:
@@ -71,14 +71,19 @@ class Engine:
     def _get_data_length(self, loader: SizedIterable) -> int:
         return len(loader)
 
-    def _get_progress_bar(self, loader: SizedIterable) -> tqdm.tqdm:
-        desc = self._get_progress_label()
+    def _get_progress_bar(
+        self,
+        loader: SizedIterable,
+        prefix: Optional[str] = None,
+        disable: bool = False,
+    ) -> tqdm.tqdm:
+        desc = self._get_progress_label(prefix)
         return tqdm.tqdm(
             iterable=loader,
             desc=desc,
             ncols=80,
             leave=False,
-            disable=not self.show_progress,
+            disable=disable,
         )
 
     def _is_done(self) -> bool:
@@ -103,7 +108,14 @@ class Engine:
     ):
         self.output_handlers.append(OutputHandler(function))
 
-    def run(self, loader: SizedIterable, max_epochs: int = 1) -> None:
+    def run(
+        self,
+        accelerator: Accelerator,
+        loader: SizedIterable,
+        max_epochs: int = 1,
+        show_progress: bool = True,
+        progress_label: Optional[str] = None,
+    ) -> None:
         self.max_epochs = max_epochs
 
         if self._is_done():
@@ -116,14 +128,18 @@ class Engine:
             self._fire_event(EventStep.EPOCH_STARTED)
 
             iterations = self._get_data_iterator(loader)
-            pbar = self._get_progress_bar(loader)
+            pbar = self._get_progress_bar(
+                loader=loader,
+                prefix=progress_label,
+                disable=not show_progress,
+            )
             epoch_length = self._get_data_length(loader)
 
             for _ in range(epoch_length):
                 self._fire_event(EventStep.ITERATION_STARTED)
 
                 batch = next(iterations)
-                output = self.process_fn(batch)
+                output = self.process_fn(accelerator, batch)
                 self._handle_output(output)
 
                 self.iteration += 1
@@ -146,6 +162,35 @@ class Engine:
     def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
         self.epoch = state_dict["epoch"]
         self.iteration = state_dict["iteration"]
+
+
+class Trainer(Engine):
+    ...
+
+
+class Evaluator(Engine):
+    ...
+
+
+class TrainerFactory(Protocol):
+    def __call__(
+        self,
+        models: Mapping[str, torch.nn.Module],
+        optimizers: Mapping[str, Mapping[str, torch.optim.Optimizer]],
+        schedulers: Mapping[
+            str, Mapping[str, torch.optim.lr_scheduler.LRScheduler]
+        ],
+        losses: Mapping[str, CompositeLoss],
+    ) -> Trainer:
+        ...
+
+
+class EvaluatorFactory(Protocol):
+    def __call__(
+        self,
+        models: Mapping[str, torch.nn.Module],
+    ) -> Evaluator:
+        ...
 
 
 class EventHandler:
