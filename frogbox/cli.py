@@ -1,5 +1,3 @@
-"""@private"""
-
 from pathlib import Path
 import importlib
 import click

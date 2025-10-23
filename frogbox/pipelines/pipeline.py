@@ -395,8 +395,7 @@ class Pipeline(ABC):
         batch if on a distributed system. Should be used for gathering the
         inputs and targets for metric calculation.
 
-        Wrapper around `Accelerator.gather_for_metrics()
-        <https://huggingface.co/docs/accelerate/main/en/package_reference/accelerator#accelerate.Accelerator.gather_for_metrics>`_.
+        Wrapper around [`Accelerator.gather_for_metrics`](https://huggingface.co/docs/accelerate/main/en/package_reference/accelerator#accelerate.Accelerator.gather_for_metrics).
         """  # noqa: E501, W505
         return self.accelerator.gather_for_metrics(
             input_data, use_gather_object

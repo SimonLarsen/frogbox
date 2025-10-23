@@ -26,17 +26,34 @@ _JINJA_EXTENSIONS: Sequence[str] = (".jinja", ".jinja2", ".j2")
 
 
 class StrictModel(BaseModel):
-    """@private"""
     model_config = ConfigDict(extra="forbid")
 
 
 class ConfigType(str, Enum):
-    """Pipeline configuration type."""
+    """
+    Pipeline configuration type.
+
+    Attributes
+    ----------
+    SUPERVISED : str
+        Supervised pipeline config.
+    """
 
     SUPERVISED = "supervised"
 
 
 class EngineType(str, Enum):
+    """
+    Engine type.
+
+    Attributes
+    ----------
+    TRAINER : str
+        Trainer
+    EVALUATOR : str
+        Evaluator
+    """
+
     TRAINER = "trainer"
     EVALUATOR = "evaluator"
 
@@ -64,7 +81,16 @@ class LogInterval(StrictModel):
 
 
 class CheckpointMode(str, Enum):
-    """Checkpoint evaluation mode."""
+    """
+    Checkpoint evaluation mode.
+
+    Attributes
+    ----------
+    MIN : str
+        Keep minimum value.
+    MAX : str
+        Keep maximum value.
+    """
 
     MIN = "min"
     MAX = "max"
@@ -97,6 +123,11 @@ ObjectArgument: TypeAlias = Union["ObjectDefinition", Any]
 
 
 class ObjectDefinition(StrictModel):
+    """
+    Object definition.
+
+    Describes either an object or callable instance.
+    """
     object: Optional[str] = None
     function: Optional[str] = None
     args: Optional[Sequence[ObjectArgument]] = None
@@ -115,6 +146,13 @@ class ObjectDefinition(StrictModel):
 class SchedulerType(str, Enum):
     """
     Parameter scheduler type.
+
+    Attributes
+    ----------
+    LINEAR : str
+        Linear schedule.
+    COSINE : str
+        Cosine schedule.
     """
 
     LINEAR = "linear"
@@ -197,28 +235,30 @@ class Config(StrictModel):
 
     Attributes
     ----------
-    type : ConfigType
+    type
         Pipeline type.
-    project : str
+    project
         Project name.
-    log_interval : EventStep or LogInterval
+    log_interval
         At which interval to log metrics.
-    batch_size : int
+    batch_size
         Batch size.
-    loader_workers : int
+    loader_workers
         How many subprocesses to use for data loading.
         `0` means the data will be loaded in the main process.
-    max_epochs : int
+    max_epochs
         Maximum number of epochs to train for.
     gradient_accumulation_steps : int
         Number of steps the gradients should be accumulated across.
-    checkpoints : list of CheckpointDefinition
-    datasets : dict of ClassDefinition
+    checkpoints
+    datasets
         Dataset definitions.
-    loaders : dict of ClassDefinition
+    loaders
         Data loader definitions.
-    metrics : dict of ClassDefinition
+    metrics
         Evaluation metrics.
+    callbacks
+        Callback functions.
     """
 
     type: ConfigType
@@ -255,14 +295,20 @@ class SupervisedConfig(Config):
 
     Attributes
     ----------
-    clip_grad_norm : float
+    clip_grad_norm
         Clip gradients to norm if provided.
-    clip_grad_norm : float
+    clip_grad_norm
         Clip gradients to value if provided.
-    model : ModelDefinition
+    model
         Model definition.
-    losses : dict of LossDefinition
+    losses
         Loss functions.
+    trainer_forward
+        Trainer custom forward function.
+        Should be function that takes `x`, `y` and `model` and returns `(y, y_pred)`.
+    evaluator_forward
+        Evaluator custom forward function.
+        Should be function that takes `x`, `y` and `model` and returns `(y, y_pred)`.
     """
 
     type: ConfigType = Field(default=ConfigType.SUPERVISED, frozen=True)
@@ -310,7 +356,7 @@ def read_config(
     format : str
         File format to read.
         If not provided, format will be inferred from filename.
-    config_kwargs : str-to-str mapping
+    config_vars : str-to-str mapping
         Keyword arguments to pass to jinja2.
     """
     if config_vars is None:
@@ -342,7 +388,14 @@ def read_config(
 
 
 def parse_log_interval(e: str | LogInterval) -> MatchableEvent:
-    """Create matchable event from log interval configuration."""
+    """
+    Create matchable event from log interval configuration.
+
+    Returns
+    -------
+    MatchableEvent
+        The parsed interval event.
+    """
     if isinstance(e, str):
         return Event(event=e)
 
@@ -363,8 +416,10 @@ def _get_module(path: str) -> Any:
 
     Example
     -------
-    >>> cl = get_class("torch.optim.Adam)
-    >>> optimizer = cl(lr=1e-5)
+    ```python
+    cl = get_class("torch.optim.Adam)
+    optimizer = cl(lr=1e-5)
+    ```
     """
     parts = path.split(".")
     module_path = ".".join(parts[:-1])
@@ -382,10 +437,23 @@ def create_object_from_config(
     Create object from dictionary configuration.
     Dictionary should have a ``class`` entry and an optional ``params`` entry.
 
+    Parameters
+    ----------
+    config
+        Object definition.
+    additional_args : *args
+        Additional positional arguments.
+        Appended to positional arguments in `config`.
+    additional_kwargs : **kwargs
+        Additional keyword arguments.
+        Keyword arguments in `config` take priority.
+
     Example
     -------
-    >>> config = {"class": "torch.optim.Adam", "params": {"lr": 1e-5}}
-    >>> optimizer = create_object_from_config(config)
+    ```python
+    config = {"class": "torch.optim.Adam", "params": {"lr": 1e-5}}
+    optimizer = create_object_from_config(config)
+    ```
     """
     # Recursively parse arguments
     args = []

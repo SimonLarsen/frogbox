@@ -24,9 +24,9 @@ def load_model_checkpoint(
 
     Parameters
     ----------
-    path : path-like
+    path : path
         Path to checkpoint file.
-    config_path : path-like
+    config_path : path
         Path to config file. If empty config will be read from "config.json"
         in the same folder as `path`.
 
