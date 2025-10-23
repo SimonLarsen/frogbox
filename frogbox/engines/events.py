@@ -4,6 +4,24 @@ from enum import Enum
 
 
 class EventStep(str, Enum):
+    """
+    Engine event step.
+
+    Attributes
+    ----------
+    STARTED : str
+        Engine run started.
+    EPOCH_STARTED : str
+        Epoch started.
+    ITERATION_STARTED : str
+        Iteration started.
+    ITERATION_COMPLETED : str
+        Iteration completed.
+    EPOCH_COMPLETED : str
+        Epoch completed.
+    COMPLETED : str
+        Engine run completed.
+    """
     STARTED = "started"
     EPOCH_STARTED = "epoch_started"
     ITERATION_STARTED = "iteration_started"
@@ -13,11 +31,15 @@ class EventStep(str, Enum):
 
 
 class MatchableEvent(ABC):
+    """Base class for events that can be matched against."""
     @abstractmethod
-    def matches(self, event: EventStep, step: int) -> bool: ...
+    def matches(self, event: EventStep, step: int) -> bool:
+        """Check if event matches specific event step iteration."""
 
 
 class EventList(MatchableEvent):
+    """List of events."""
+
     def __init__(self):
         self.events = []
 
@@ -33,6 +55,8 @@ class EventList(MatchableEvent):
 
 
 class Event(MatchableEvent):
+    """Event."""
+
     def __init__(
         self,
         event: str | EventStep,

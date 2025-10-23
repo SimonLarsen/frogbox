@@ -1,7 +1,3 @@
-"""
-.. include:: ./intro.md
-"""
-
 __version__ = "0.5.3"
 
 from accelerate.utils import set_seed  # noqa: F401
