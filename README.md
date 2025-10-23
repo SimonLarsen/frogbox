@@ -18,9 +18,9 @@ Frogbox is an opinionated PyTorch machine learning framework built for rapid pro
 ## Installation
 
 ```sh
-pip install git+https://SimonLarsen@github.com/SimonLarsen/frogbox.git@v0.5.3
+pip install frogbox
 ```
 
 ## Getting started
 
-See [documentation](https://simonlarsen.github.io/frogbox).
+See [documentation](https://frogbox.readthedocs.io).

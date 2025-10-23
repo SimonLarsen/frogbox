@@ -1,16 +1,15 @@
 site_name: frogbox
 
 nav:
-- Home: index.md
-- Getting started: getting_started.md
+- Getting started: index.md
 - Reference:
   - Config:
     - Config schema: reference/config/schema.md
     - SupervisedConfig example: reference/config/supervised_example.md
   - Pipelines: reference/pipelines.md
-  - Metrics: reference/metrics.md
   - Events: reference/events.md
 - Guides:
+  - Metrics: guides/metrics.md
   - Callbacks:
     - Custom callbacks: guides/callbacks/custom_callbacks.md
     - Logging images: guides/callbacks/logging_images.md
