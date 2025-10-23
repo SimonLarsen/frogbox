@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://hisimon.dk/frogbox"
+Homepage = "https://github.com/SimonLarsen/frogbox"
 Issues = "https://github.com/SimonLarsen/frogbox/issues"
 
 [project.scripts]

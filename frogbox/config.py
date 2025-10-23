@@ -305,10 +305,12 @@ class SupervisedConfig(Config):
         Loss functions.
     trainer_forward
         Trainer custom forward function.
-        Should be function that takes `x`, `y` and `model` and returns `(y, y_pred)`.
+        Should be function that takes `x`, `y` and `model`
+        and returns `(y, y_pred)`.
     evaluator_forward
         Evaluator custom forward function.
-        Should be function that takes `x`, `y` and `model` and returns `(y, y_pred)`.
+        Should be function that takes `x`, `y` and `model`
+        and returns `(y, y_pred)`.
     """
 
     type: ConfigType = Field(default=ConfigType.SUPERVISED, frozen=True)
