@@ -100,6 +100,7 @@ def new_project(type_: str, format_: str, dir_: Path, overwrite: bool = False):
         cfg = SupervisedConfig(
             type=ConfigType.SUPERVISED,
             project="example",
+            tracker="wandb",
             model=example_model,
             datasets={
                 "train": example_dataset,

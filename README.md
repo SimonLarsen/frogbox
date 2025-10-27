@@ -11,7 +11,7 @@ Frogbox is an opinionated PyTorch machine learning framework built for rapid pro
 
 * Experiments are defined using JSON files and support [jinja2](https://jinja.palletsprojects.com) templates.
 * Flexible event system inspired by [Ignite](https://pytorch.org/ignite).
-* Automatic experiment tracking. Currently only [Weights & Biases](https://wandb.ai/) is supported with other platforms planned.
+* Automatic experiment tracking. Currently, [Weights & Biases](https://wandb.ai) and [MLFlow](https://mlflow.org) is supported with other platforms planned.
 * CLI tool for easy project management.
 * Integrates [Accelerate](https://huggingface.co/docs/accelerate/index) to support automatic mixed precision (AMP) and distributed training.
 
