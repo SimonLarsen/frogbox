@@ -105,8 +105,8 @@ class ImageLogger(Callback):
                 grid = self._combine_test_images([e[i] for e in outputs])
                 images.append(grid)
 
-        wandb_images = [wandb.Image(to_pil_image(image)) for image in images]
-        pipeline.log({self.log_label: wandb_images})
+        pil_images = [to_pil_image(image) for image in images]
+        pipeline.log_images(self.log_label, pil_images)
 
     def _combine_test_images(
         self, images: Sequence[torch.Tensor]

@@ -96,7 +96,7 @@ class Engine:
         *args,
         **kwargs,
     ):
-        if isinstance(event, str) or isinstance(event, EventStep):
+        if isinstance(event, (str, EventStep)):
             event = Event(event)
         self.event_handlers.append(
             EventHandler(event, function, *args, **kwargs)

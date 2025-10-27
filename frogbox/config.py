@@ -32,30 +32,28 @@ class StrictModel(BaseModel):
 class ConfigType(str, Enum):
     """
     Pipeline configuration type.
-
-    Attributes
-    ----------
-    SUPERVISED : str
-        Supervised pipeline config.
     """
 
     SUPERVISED = "supervised"
+    """Supervised pipeline config."""
 
 
 class EngineType(str, Enum):
-    """
-    Engine type.
-
-    Attributes
-    ----------
-    TRAINER : str
-        Trainer
-    EVALUATOR : str
-        Evaluator
-    """
+    """Engine type."""
 
     TRAINER = "trainer"
+    """Trainer"""
     EVALUATOR = "evaluator"
+    """Evaluator"""
+
+
+class TrackerType(str, Enum):
+    """Experiment tracker."""
+
+    WANDB = "wandb"
+    """Weights & Biases"""
+    MLFLOW = "mlflow"
+    """MLFlow"""
 
 
 class LogInterval(StrictModel):
@@ -81,25 +79,17 @@ class LogInterval(StrictModel):
 
 
 class CheckpointMode(str, Enum):
-    """
-    Checkpoint evaluation mode.
-
-    Attributes
-    ----------
-    MIN : str
-        Keep minimum value.
-    MAX : str
-        Keep maximum value.
-    """
+    """Checkpoint evaluation mode."""
 
     MIN = "min"
+    """Keep minium value."""
     MAX = "max"
+    """Keep maximum value."""
 
 
 class CheckpointDefinition(StrictModel):
     """
     Checkpoint definition.
-
 
     Attributes
     ----------
@@ -144,19 +134,12 @@ class ObjectDefinition(StrictModel):
 
 
 class SchedulerType(str, Enum):
-    """
-    Parameter scheduler type.
-
-    Attributes
-    ----------
-    LINEAR : str
-        Linear schedule.
-    COSINE : str
-        Cosine schedule.
-    """
+    """Parameter scheduler type."""
 
     LINEAR = "linear"
+    """Linear schedule."""
     COSINE = "cosine"
+    """Cosine schedule."""
 
 
 class LRSchedulerDefinition(StrictModel):
@@ -263,6 +246,7 @@ class Config(StrictModel):
 
     type: ConfigType
     project: str
+    tracker: TrackerType
     log_interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
     batch_size: int = Field(default=32, ge=1)
     loader_workers: int = Field(default=0, ge=0)

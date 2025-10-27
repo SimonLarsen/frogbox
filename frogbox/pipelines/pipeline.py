@@ -12,10 +12,12 @@ from abc import ABC
 import datetime
 import warnings
 from functools import partial
+from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.optim.lr_scheduler import LRScheduler
 from accelerate import Accelerator
+from accelerate.tracking import WandBTracker, MLflowTracker
 from torchmetrics import Metric
 from .name_generation import generate_name
 from ..engines.engine import (
@@ -31,6 +33,7 @@ from ..config import (
     ObjectDefinition,
     ModelDefinition,
     LossDefinition,
+    TrackerType,
     parse_log_interval,
     create_object_from_config,
 )
@@ -76,12 +79,22 @@ class Pipeline(ABC):
         # Create accelerator
         self.accelerator = Accelerator(
             gradient_accumulation_steps=config.gradient_accumulation_steps,
-            log_with="wandb",
+            log_with=config.tracker,
         )
+
+        if config.tracker == TrackerType.MLFLOW:
+            import mlflow.config
+
+            mlflow.config.enable_system_metrics_logging()
+            mlflow.config.enable_async_logging(True)
+
         self.accelerator.init_trackers(
             project_name=self.config.project,
             config=self.config.model_dump(),
-            init_kwargs={"wandb": {"name": self.run_name}},
+            init_kwargs={
+                "wandb": {"name": self.run_name},
+                "mlflow": {"run_name": self.run_name}
+            },
         )
 
         self._create_data_loaders(
@@ -384,6 +397,28 @@ class Pipeline(ABC):
     def log(self, data: Mapping[str, Any]) -> None:
         """Log data to tracker(s)."""
         self.accelerator.log(data, step=self.trainer.iteration)
+
+    def log_images(self, key: str, images: Sequence[Image.Image]) -> None:
+        step = self.trainer.iteration
+        for tracker in self.accelerator.trackers:
+            if isinstance(tracker, WandBTracker):
+                tracker.log_images(values={key: images}, step=step)
+
+            elif isinstance(tracker, MLflowTracker):
+                if len(images) != 1:
+                    raise RuntimeError(
+                        "MLFlow only supports logging single images."
+                    )
+
+                import mlflow
+
+                mlflow.log_image(images[0], key=key, step=step)
+
+            else:
+                raise RuntimeError(
+                    "log_images is not supported for" +
+                    tracker.__class__.__name__
+                )
 
     def print(self, *args, **kwargs) -> None:
         """Drop in replacement of `print()` to only print once per server."""
