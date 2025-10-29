@@ -19,12 +19,12 @@ from ..config import Config
 SavedCheckpoint = namedtuple("SavedCheckpoint", ["filename", "priority"])
 
 
-def _fixed_compiled_model_keys(
+def _fix_compiled_model_keys(
     state_dict: Mapping[str, torch.Tensor]
 ) -> Mapping[str, torch.Tensor]:
     fixed = {}
     for key, value in state_dict.items():
-        key = key.replace("._orig_mod", "")
+        key = key.replace("_orig_mod.", "")
         fixed[key] = value
     return fixed
 
@@ -119,7 +119,7 @@ class Checkpoint:
         for key, obj in self._to_save.items():
             if key in self._to_unwrap:
                 obj = self._accelerator.unwrap_model(obj)
-                state_dicts[key] = _fixed_compiled_model_keys(obj.state_dict())
+                state_dicts[key] = _fix_compiled_model_keys(obj.state_dict())
             else:
                 state_dicts[key] = obj.state_dict()
 
