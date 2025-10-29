@@ -174,9 +174,8 @@ class OptimizerDefinition(ObjectDefinition):
     Optimizer definition.
     """
 
-    class_name: str = "torch.optim.AdamW"
+    object: str = "torch.optim.AdamW"
     kwargs: Optional[Mapping[str, ObjectArgument]] = {"lr": 1e-3}
-    target: Optional[str] = None
     scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
 
 

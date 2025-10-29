@@ -8,7 +8,6 @@ from torchvision.transforms.functional import (
 )
 from torchvision.utils import make_grid
 import tqdm
-import wandb
 from .callback import Callback
 from ..pipelines.pipeline import Pipeline
 from ..tensor_utils import convert_tensor
