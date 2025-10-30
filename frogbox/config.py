@@ -110,6 +110,7 @@ class CheckpointDefinition(StrictModel):
 
 
 ObjectArgument: TypeAlias = Union["ObjectDefinition", Any]
+"""Argument that can be passed to an object definition."""
 
 
 class ObjectDefinition(StrictModel):
@@ -117,7 +118,19 @@ class ObjectDefinition(StrictModel):
     Object definition.
 
     Describes either an object or callable instance.
+
+    Attributes
+    ----------
+    object
+        Import path to object constructor.
+    function
+        Import path to function.
+    args
+        Positional arguments.
+    kwargs
+        Keyword arguments.
     """
+
     object: Optional[str] = None
     function: Optional[str] = None
     args: Optional[Sequence[ObjectArgument]] = None
@@ -172,6 +185,11 @@ class LRSchedulerDefinition(StrictModel):
 class OptimizerDefinition(ObjectDefinition):
     """
     Optimizer definition.
+
+    Attributes
+    ----------
+    scheduler
+        Learning rate scheduler definition.
     """
 
     object: str = "torch.optim.AdamW"
@@ -182,6 +200,11 @@ class OptimizerDefinition(ObjectDefinition):
 class ModelDefinition(ObjectDefinition):
     """
     Model definition.
+
+    Attributes
+    ----------
+    optimizers
+        Optimizer definitions.
     """
 
     optimizers: Mapping[str, OptimizerDefinition] = {
@@ -205,6 +228,13 @@ class LossDefinition(ObjectDefinition):
 class CallbackDefinition(ObjectDefinition):
     """
     Callback definition.
+
+    Attributes
+    ----------
+    interval
+        Event describing when to call callback.
+    engine
+        Which engine to bind the callback to.
     """
 
     interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
