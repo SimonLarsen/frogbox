@@ -190,10 +190,49 @@ class OptimizerDefinition(ObjectDefinition):
     ----------
     scheduler
         Learning rate scheduler definition.
+    parameters
+        Which parameters in the model to optimize.
+        Must be either a regex matching the parameter names to include or
+        a callable that takes in the model and returns a list of parameters.
+
+    Example
+    -------
+    Defining target parameters using regex:
+
+    ```yaml title="config.yml"
+    model:
+      ...
+      optimizers:
+        encoder:
+          ...
+          parameters: "encoder\\..*"
+    ```
+
+    Defining target parameters using a function:
+
+    ```yaml title="config.yml"
+    model:
+      ...
+      optimizers:
+        encoder:
+          ...
+          parameters:
+            function: params.encoder_params
+    ```
+    ```python title="params.py"
+    import torch
+
+    def encoder_params(model: torch.nn.Module):
+        return [
+            m for n, m in model.named_parameters()
+            if n.startswith("encoder.")
+        ]
+    ```
     """
 
     object: str = "torch.optim.AdamW"
     kwargs: Optional[Mapping[str, ObjectArgument]] = {"lr": 1e-3}
+    parameters: Optional[str | ObjectDefinition] = None
     scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
 
 

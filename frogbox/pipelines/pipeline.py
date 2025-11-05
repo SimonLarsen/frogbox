@@ -6,11 +6,13 @@ from typing import (
     Sequence,
     Callable,
     Tuple,
+    Iterable,
 )
 from os import PathLike
 from abc import ABC
 import datetime
 import warnings
+import re
 from functools import partial
 from PIL import Image
 import torch
@@ -32,6 +34,7 @@ from ..config import (
     Config,
     ObjectDefinition,
     ModelDefinition,
+    OptimizerDefinition,
     LossDefinition,
     TrackerType,
     parse_log_interval,
@@ -244,10 +247,7 @@ class Pipeline(ABC):
             self._schedulers[model_name] = {}
 
             for optimizer_name, optimizer_cfg in model_cfg.optimizers.items():
-                optimizer = create_object_from_config(
-                    optimizer_cfg,
-                    params=model.parameters(),
-                )
+                optimizer = self._create_optimizer(optimizer_cfg, model)
 
                 scheduler = create_lr_scheduler(
                     optimizer=optimizer,
@@ -260,6 +260,27 @@ class Pipeline(ABC):
                 )
                 self._optimizers[model_name][optimizer_name] = optimizer
                 self._schedulers[model_name][optimizer_name] = scheduler
+
+    def _create_optimizer(
+        self,
+        config: OptimizerDefinition,
+        model: torch.nn.Module,
+    ) -> torch.optim.Optimizer:
+        params: Iterable[torch.nn.Parameter]
+        if isinstance(config.parameters, str):
+            regex = re.compile(config.parameters)
+            params = [
+                m for n, m in model.named_parameters()
+                if regex.match(n)
+            ]
+        elif isinstance(config.parameters, ObjectDefinition):
+            get_params = create_object_from_config(config.parameters)
+            params = get_params(model)
+        else:
+            params = list(model.parameters())
+
+        print("Param count:", sum(p.numel() for p in params))
+        return create_object_from_config(config, params=params)
 
     def _create_losses(
         self, losses: Mapping[str, Mapping[str, LossDefinition]]

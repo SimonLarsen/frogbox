@@ -93,3 +93,7 @@ class SupervisedPipeline(Pipeline):
     @property
     def model(self) -> torch.nn.Module:
         return self._models["model"]
+
+    @property
+    def optimizers(self) -> Dict[str, torch.optim.Optimizer]:
+        return self._optimizers["model"]
