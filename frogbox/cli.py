@@ -1,5 +1,5 @@
 from pathlib import Path
-import importlib
+import importlib.resources
 import click
 
 
