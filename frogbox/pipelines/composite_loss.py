@@ -1,6 +1,9 @@
+from typing import Optional, Sequence, Callable, Any, TypeAlias
 import inspect
-from typing import Optional, Sequence, Mapping, Callable, Any
 import torch
+
+
+LossTransform: TypeAlias = Callable[[Any, Any], Any]
 
 
 class CompositeLoss(torch.nn.Module):
@@ -13,17 +16,18 @@ class CompositeLoss(torch.nn.Module):
         labels: Sequence[str],
         losses: Sequence[torch.nn.Module],
         weights: Sequence[float],
-        transforms: Optional[Mapping[str, Callable[[Any, Any], Any]]] = None,
+        transforms: Optional[Sequence[Optional[LossTransform]]] = None,
     ):
         super().__init__()
 
         assert len(labels) == len(losses) == len(weights)
+        if transforms is None:
+            transforms = [None] * len(labels)
+        assert len(transforms) == len(labels), f"{len(labels), len(transforms)}"
 
         self.labels = labels
         self.losses = torch.nn.ModuleList(losses)
         self.weights = weights
-        if transforms is None:
-            transforms = {}
         self.transforms = transforms
         self.last_values = [None] * len(losses)
 
@@ -37,14 +41,14 @@ class CompositeLoss(torch.nn.Module):
         Compute loss.
         """
         total_loss = 0.0
-        for i, (weight, fn, label) in enumerate(
-            zip(self.weights, self.losses, self.labels)
+        for i, (weight, loss_fn, transform) in enumerate(
+            zip(self.weights, self.losses, self.transforms)
         ):
             args = (input, target)
-            if label in self.transforms:
-                args = self.transforms[label](*args)
-            extra_args = self._gather_extra_args(fn, kwargs)
-            loss = weight * fn(*args, **extra_args)
+            if transform is not None:
+                args = transform(*args)
+            extra_args = self._gather_extra_args(loss_fn, kwargs)
+            loss = weight * loss_fn(*args, **extra_args)
             total_loss += loss
             self.last_values[i] = loss.item()
         return total_loss

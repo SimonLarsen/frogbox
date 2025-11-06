@@ -259,9 +259,13 @@ class LossDefinition(ObjectDefinition):
     ----------
     weight : float
         Loss function weight.
+    transform : callable
+        Callable that takes in `y_pred` and `y` and outputs what is passed to
+        the loss function.
     """
 
     weight: float = 1.0
+    transform: Optional[ObjectDefinition] = None
 
 
 class CallbackDefinition(ObjectDefinition):

@@ -279,7 +279,6 @@ class Pipeline(ABC):
         else:
             params = list(model.parameters())
 
-        print("Param count:", sum(p.numel() for p in params))
         return create_object_from_config(config, params=params)
 
     def _create_losses(
@@ -292,20 +291,26 @@ class Pipeline(ABC):
     def _create_composite_loss(
         self,
         config: Mapping[str, LossDefinition],
-        transforms: Optional[Mapping[str, Callable[[Any, Any], Any]]] = None,
     ) -> CompositeLoss:
-        loss_labels = []
-        loss_modules = []
-        loss_weights = []
-        for loss_label, loss_conf in config.items():
-            loss_labels.append(loss_label)
-            loss_modules.append(create_object_from_config(loss_conf))
-            loss_weights.append(loss_conf.weight)
+        labels = []
+        losses = []
+        weights = []
+        transforms = []
+        for label, loss_cfg in config.items():
+            labels.append(label)
+            losses.append(create_object_from_config(loss_cfg))
+            weights.append(loss_cfg.weight)
+            if loss_cfg.transform is not None:
+                transforms.append(
+                    create_object_from_config(loss_cfg.transform)
+                )
+            else:
+                transforms.append(None)
 
         loss_fn = CompositeLoss(
-            labels=loss_labels,
-            losses=loss_modules,
-            weights=loss_weights,
+            labels=labels,
+            losses=losses,
+            weights=weights,
             transforms=transforms,
         ).to(self.device)
         return loss_fn
