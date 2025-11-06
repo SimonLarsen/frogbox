@@ -257,9 +257,9 @@ class LossDefinition(ObjectDefinition):
 
     Attributes
     ----------
-    weight : float
+    weight
         Loss function weight.
-    transform : callable
+    transform
         Callable that takes in `y_pred` and `y` and outputs what is passed to
         the loss function.
     """
