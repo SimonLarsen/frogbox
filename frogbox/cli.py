@@ -114,7 +114,12 @@ def new_project(type_: str, format_: str, dir_: Path, overwrite: bool = False):
     if format_ == "yaml":
         import yaml
 
-        cfg_data = yaml.safe_dump(json.loads(cfg_json))
+        cfg_data = yaml.safe_dump(
+            json.loads(cfg_json),
+            sort_keys=False,
+            allow_unicode=True,
+            default_flow_style=False,
+        )
         output_path = dir_ / "configs" / "example.yaml"
     elif format_ == "json":
         cfg_data = cfg_json
