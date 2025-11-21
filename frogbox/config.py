@@ -131,17 +131,27 @@ class ObjectDefinition(StrictModel):
         Keyword arguments.
     """
 
+    model_config = ConfigDict(
+        validate_by_name=True,
+        serialize_by_alias=True,
+    )
     object: Optional[str] = None
     function: Optional[str] = None
+    lambda_: Optional[str] = Field(default=None, alias="lambda")
     args: Optional[Sequence[ObjectArgument]] = None
     kwargs: Optional[Mapping[str, ObjectArgument]] = None
 
     @model_validator(mode="after")
     def verify_object_or_function(self) -> "ObjectDefinition":
-        if self.object is not None and self.function is not None:
+        num_set = (
+            int(self.object is not None) +
+            int(self.function is not None) +
+            int(self.lambda_ is not None)
+        )
+        if num_set != 1:
             raise ValueError(
-                "Object definition should only have either"
-                ' "object" or "function" field.'
+                "Object definition should have one and only one of"
+                ' "object", "function" and "lambda".'
             )
         return self
 
@@ -536,6 +546,10 @@ def create_object_from_config(
 
     if config.function is not None:
         fun = _get_module(config.function)
+        return partial(fun, *args, **kwargs)
+
+    if config.lambda_ is not None:
+        fun = eval("lambda " + config.lambda_)
         return partial(fun, *args, **kwargs)
 
     return RuntimeError("Cannot create object from definition.")

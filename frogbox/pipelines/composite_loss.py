@@ -23,7 +23,7 @@ class CompositeLoss(torch.nn.Module):
         assert len(labels) == len(losses) == len(weights)
         if transforms is None:
             transforms = [None] * len(labels)
-        assert len(transforms) == len(labels), f"{len(labels), len(transforms)}"
+        assert len(transforms) == len(labels)
 
         self.labels = labels
         self.losses = torch.nn.ModuleList(losses)
