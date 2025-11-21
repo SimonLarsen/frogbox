@@ -125,6 +125,11 @@ class ObjectDefinition(StrictModel):
         Import path to object constructor.
     function
         Import path to function.
+    lambda
+        Lambda function definition.
+
+        Should have format `{args}: {expr}`.
+        Example: `x, y: x + y`.
     args
         Positional arguments.
     kwargs
