@@ -1,4 +1,4 @@
-__version__ = "0.5.3"
+__version__ = "0.6.0"
 
 from accelerate.utils import set_seed  # noqa: F401
 from .config import read_config, SupervisedConfig  # noqa: F401
