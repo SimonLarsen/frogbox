@@ -16,7 +16,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.x"
 
       - name: Build release distributions
         run: |
@@ -34,11 +34,8 @@ jobs:
     needs:
       - release-build
     permissions:
-      # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
 
-    # Dedicated environments with protections for publishing are strongly recommended.
-    # For more information, see: https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment#deployment-protection-rules
     environment:
       name: pypi
       url: https://pypi.org/p/frogbox
