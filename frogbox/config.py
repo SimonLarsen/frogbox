@@ -309,6 +309,8 @@ class Config(StrictModel):
         Pipeline type.
     project
         Project name.
+    tracker
+        Tracker to use for logging.
     log_interval
         At which interval to log metrics.
     batch_size
