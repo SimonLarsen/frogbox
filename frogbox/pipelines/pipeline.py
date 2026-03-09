@@ -228,6 +228,7 @@ class Pipeline(ABC):
                         batch_size=batch_size,
                         num_workers=loader_workers,
                         shuffle=split == "train",
+                        persistent_workers=split == "train",
                     )
 
                 loader = self.accelerator.prepare(loader)
