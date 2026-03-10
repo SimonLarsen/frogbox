@@ -240,16 +240,8 @@ class LRSchedulerDefinition(StrictModel):
     ----------
     type : SchedulerType
         Scheduler type.
-    start_value : float
-        Initial learning rate.
     end_value : float
         Final learning rate.
-    cycles : int
-        Number of scheduler cycles. Defaults to `1`.
-    start_value_mult : float
-        Ratio by which to change the start value at the end of each cycle.
-    end_value_mult : float
-        Ratio by which to change the end value at the end of each cycle.
     warmup_stets : int
         Number of steps to perform warmup. Set to `0` to disable warmup.
     """
