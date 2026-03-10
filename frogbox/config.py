@@ -135,7 +135,7 @@ class ObjectDefinition(StrictModel):
         Positional arguments.
     kwargs
         Keyword arguments.
-    
+
     Example
     -------
     Creating an object instance:
@@ -165,7 +165,7 @@ class ObjectDefinition(StrictModel):
         kwargs:
             clamp: true
     ```
-    
+
     ```python title="Equivalent Python"
     # myfun.py
     def forward(x, y, model, clamp):
@@ -179,7 +179,7 @@ class ObjectDefinition(StrictModel):
         clamp=True,
     )
     ```
-    
+
     </div>
 
     Creating a lambda function:
