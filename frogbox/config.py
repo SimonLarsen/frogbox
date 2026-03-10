@@ -118,6 +118,7 @@ class ObjectDefinition(StrictModel):
     Object definition.
 
     Describes either an object or callable instance.
+    Only one of `object`, `function` and `lambda` can provided at a time.
 
     Attributes
     ----------
@@ -134,6 +135,67 @@ class ObjectDefinition(StrictModel):
         Positional arguments.
     kwargs
         Keyword arguments.
+    
+    Example
+    -------
+    Creating an object instance:
+
+    <div class="grid" markdown>
+
+    ```yaml title="YAML"
+    loss_fn:
+        object: torch.nn.L1Loss
+        kwargs:
+            reduction: mean
+    ```
+
+    ```python title="Equivalent Python"
+    loss_fn = torch.nn.L1Loss(reduction="mean")
+    ```
+
+    </div>
+
+    Creating a function instance:
+
+    <div class="grid" markdown>
+
+    ```yaml title="YAML"
+    forward:
+        function: myfun.forward
+        kwargs:
+            clamp: true
+    ```
+    
+    ```python title="Equivalent Python"
+    # myfun.py
+    def forward(x, y, model, clamp):
+        y_pred = model(x)
+        if clamp:
+            pred = pred.clamp(0, 1)
+        return y, y_pred
+
+    loss_fn = functools.partial(
+        myfun.forward,
+        clamp=True,
+    )
+    ```
+    
+    </div>
+
+    Creating a lambda function:
+
+    <div class="grid" markdown>
+
+    ```yaml title="YAML"
+    forward:
+        lambda: "x, y, model: (y, model(x))"
+    ```
+
+    ```python title="Equivalent Python"
+    forward = lambda: x, y, model: (y, model(x))
+    ```
+
+    </div>
     """
 
     model_config = ConfigDict(
