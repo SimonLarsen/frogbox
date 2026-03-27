@@ -10,6 +10,7 @@ nav:
     - SupervisedConfig example: reference/config/supervised_example.md
   - Pipelines: reference/pipelines.md
   - Events: reference/events.md
+  - Callbacks: reference/callbacks.md
 - Guides:
   - Metrics: guides/metrics.md
   - Callbacks:
