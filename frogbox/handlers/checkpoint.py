@@ -34,7 +34,7 @@ def _map_state_dict_to_compiled_model(
     model: torch.nn.Module,
 ) -> Mapping[str, torch.Tensor]:
     key_map = {
-        key.replace("._orig_mod", ""): key
+        key.replace("_orig_mod.", ""): key
         for key in model.state_dict().keys()
     }
 
