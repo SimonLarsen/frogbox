@@ -1,4 +1,4 @@
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, Union
 from collections.abc import Sequence, Mapping
 from os import PathLike
 from enum import Enum
@@ -110,7 +110,7 @@ class CheckpointDefinition(StrictModel):
     mode: CheckpointMode = CheckpointMode.MAX
 
 
-ObjectArgument: TypeAlias = "ObjectDefinition" | Any
+ObjectArgument: TypeAlias = Union["ObjectDefinition", Any]
 """Argument that can be passed to an object definition."""
 
 
