@@ -1,4 +1,3 @@
-from typing import Tuple
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets import CIFAR10
@@ -33,7 +32,7 @@ class ExampleDataset(Dataset):
     def augment(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         image, _ = self.data[idx]
         image = pil_to_tensor(image) / 255
 

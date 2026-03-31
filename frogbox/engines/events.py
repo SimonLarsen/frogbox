@@ -1,4 +1,3 @@
-from typing import Optional
 from abc import ABC, abstractmethod
 from enum import Enum
 
@@ -60,9 +59,9 @@ class Event(MatchableEvent):
     def __init__(
         self,
         event: str | EventStep,
-        every: Optional[int] = None,
-        first: Optional[int] = None,
-        last: Optional[int] = None,
+        every: int | None = None,
+        first: int | None = None,
+        last: int | None = None,
     ):
         self.event = EventStep(event)
         self.every = every

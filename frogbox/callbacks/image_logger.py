@@ -1,4 +1,5 @@
-from typing import Sequence, Optional, Callable, Any, Tuple
+from typing import Callable, Any
+from collections.abc import Sequence
 import torch
 from torchvision.transforms.functional import (
     center_crop,
@@ -13,7 +14,7 @@ from ..pipelines.pipeline import Pipeline
 from ..tensor_utils import convert_tensor
 
 
-def _default_forward(x: Any, y: Any, model: Callable) -> Tuple[Any, ...]:
+def _default_forward(x: Any, y: Any, model: Callable) -> tuple[Any, ...]:
     return x, model(x), y
 
 
@@ -27,11 +28,9 @@ class ImageLogger(Callback):
         model_key: str = "model",
         resize_to_fit: bool = True,
         interpolation: str | InterpolationMode = "nearest",
-        num_cols: Optional[int] = None,
+        num_cols: int | None = None,
         show_progress: bool = False,
-        forward: Optional[
-            Callable[[Any, Any, Callable], Tuple[Any, ...]]
-        ] = None,
+        forward: Callable[[Any, Any, Callable], tuple[Any, ...]] | None = None,
     ):
         """
         Create ImageLogger.

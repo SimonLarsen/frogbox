@@ -1,4 +1,5 @@
-from typing import Optional, Sequence, Callable, Any, TypeAlias
+from typing import Callable, Any, TypeAlias
+from collections.abc import Sequence
 import inspect
 import torch
 
@@ -16,7 +17,7 @@ class CompositeLoss(torch.nn.Module):
         labels: Sequence[str],
         losses: Sequence[torch.nn.Module],
         weights: Sequence[float],
-        transforms: Optional[Sequence[Optional[LossTransform]]] = None,
+        transforms: Sequence[LossTransform | None] | None = None,
     ):
         super().__init__()
 

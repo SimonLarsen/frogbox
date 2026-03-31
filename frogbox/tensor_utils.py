@@ -1,4 +1,5 @@
-from typing import cast, Any, Callable, Optional, Mapping, Sequence
+from typing import cast, Any, Callable
+from collections.abc import Mapping, Sequence
 import torch
 
 
@@ -41,8 +42,8 @@ def apply_to_tensor(x: Any, function: Callable) -> Any:
 
 def convert_tensor(
     x: Any,
-    device: Optional[torch.device] = None,
-    dtype: Optional[torch.dtype] = None,
+    device: torch.device | None = None,
+    dtype: torch.dtype | None = None,
 ) -> Any:
     """
     Recursively convert tensors in collection to `dtype` and/or move to
@@ -56,7 +57,7 @@ def convert_tensor(
         dtype to convert tensors to.
     """
 
-    def _convert(e):
+    def _convert(e: torch.Tensor) -> torch.Tensor:
         return e.to(device=device, dtype=dtype)
 
     return apply_to_tensor(x, _convert)

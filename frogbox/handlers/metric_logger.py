@@ -1,4 +1,5 @@
-from typing import Mapping, Callable, Optional, Any
+from typing import Callable, Any
+from collections.abc import Mapping
 from torchmetrics import Metric
 from ..engines.engine import Engine
 from ..engines.events import EventStep
@@ -9,7 +10,7 @@ class MetricLogger:
         self,
         metrics: Mapping[str, Metric],
         log_function: Callable[[Any], None],
-        prefix: Optional[str] = None,
+        prefix: str | None = None,
     ):
         self._metrics = metrics
         self._log_function = log_function

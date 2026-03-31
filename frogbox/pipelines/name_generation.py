@@ -1,7 +1,8 @@
+from typing import cast
 import numpy as np
 
 
-ADJECTIVES = [
+ADJECTIVES: list[str] = [
     "adorable",
     "adventurous",
     "aggressive",
@@ -452,6 +453,6 @@ ANIMALS = [
 
 def generate_name() -> str:
     rng = np.random.default_rng()
-    adj = rng.choice(ADJECTIVES)
-    noun = rng.choice(ANIMALS)
+    adj = cast(str, rng.choice(ADJECTIVES))
+    noun = cast(str, rng.choice(ANIMALS))
     return f"{adj}-{noun}"

@@ -1,16 +1,14 @@
-from typing import cast, Mapping, Optional, Sequence
+from typing import cast
+from collections.abc import Sequence, Mapping
 from pathlib import Path
 import click
-from frogbox.config import read_config
+from frogbox.config import read_config, SupervisedConfig
 from frogbox.pipelines.pipeline import Pipeline
-from frogbox import (
-    SupervisedConfig,
-    SupervisedPipeline,
-)
+from frogbox.pipelines.supervised import SupervisedPipeline
 
 
-def _validate_vars(ctx, param, values) -> Mapping[str, str]:
-    out = {}
+def _validate_vars(ctx, param, values) -> dict[str, str]:
+    out: dict[str, str] = {}
     for value in values:
         pos = value.find("=")
         assert pos >= 1
@@ -18,8 +16,8 @@ def _validate_vars(ctx, param, values) -> Mapping[str, str]:
     return out
 
 
-def _validate_checkpoint_keys(ctx, param, values) -> Sequence[str]:
-    out = []
+def _validate_checkpoint_keys(ctx, param, values: Sequence[str]) -> list[str]:
+    out: list[str] = []
     for value in values:
         for key in value.split(","):
             out.append(key.strip())
@@ -68,10 +66,10 @@ def _validate_checkpoint_keys(ctx, param, values) -> Sequence[str]:
 )
 def run(
     config: Path,
-    config_format: Optional[str] = None,
-    checkpoint: Optional[Path] = None,
-    checkpoint_keys: Optional[Sequence[str]] = None,
-    config_vars: Optional[Mapping[str, str]] = None,
+    config_format: str | None = None,
+    checkpoint: Path | None = None,
+    checkpoint_keys: Sequence[str] | None = None,
+    config_vars: Mapping[str, str] | None = None,
     **kwargs,
 ) -> Pipeline:
     if config_vars is None:

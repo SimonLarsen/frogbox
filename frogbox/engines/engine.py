@@ -1,15 +1,5 @@
-from typing import (
-    Callable,
-    Protocol,
-    Iterator,
-    List,
-    Any,
-    Dict,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-)
+from typing import Callable, Protocol, Any
+from collections.abc import Mapping, Sequence, Iterator
 import tqdm
 import torch
 from accelerate import Accelerator
@@ -28,16 +18,16 @@ class SizedIterable(Protocol):
 class Engine:
     def __init__(
         self,
-        process_fn: Callable[[Accelerator, Tuple[Any, Any]], Any],
+        process_fn: Callable[[Accelerator, tuple[Any, Any]], Any],
     ):
         self.process_fn = process_fn
 
-        self.epoch = 0
-        self.iteration = 0
-        self.max_epochs = 1
+        self.epoch: int = 0
+        self.iteration: int = 0
+        self.max_epochs: int = 1
 
-        self.event_handlers: List[EventHandler] = []
-        self.output_handlers: List[OutputHandler] = []
+        self.event_handlers: list[EventHandler] = []
+        self.output_handlers: list[OutputHandler] = []
 
     def _fire_event(self, event: EventStep) -> None:
         step = 0
@@ -57,7 +47,7 @@ class Engine:
         for handler in self.output_handlers:
             handler.function(output)
 
-    def _get_progress_label(self, prefix: Optional[str] = None) -> str:
+    def _get_progress_label(self, prefix: str | None = None) -> str:
         label = ""
         if self.max_epochs > 1:
             label += f"[{self.epoch+1}/{self.max_epochs}]"
@@ -74,7 +64,7 @@ class Engine:
     def _get_progress_bar(
         self,
         loader: SizedIterable,
-        prefix: Optional[str] = None,
+        prefix: str | None = None,
         disable: bool = False,
     ) -> tqdm.tqdm:
         desc = self._get_progress_label(prefix)
@@ -114,7 +104,7 @@ class Engine:
         loader: SizedIterable,
         max_epochs: int = 1,
         show_progress: bool = True,
-        progress_label: Optional[str] = None,
+        progress_label: str | None = None,
     ) -> None:
         self.max_epochs = max_epochs
 
@@ -153,7 +143,7 @@ class Engine:
 
         self._fire_event(EventStep.COMPLETED)
 
-    def state_dict(self) -> Dict[str, Any]:
+    def state_dict(self) -> dict[str, Any]:
         return dict(
             epoch=self.epoch,
             iteration=self.iteration,
@@ -204,7 +194,7 @@ class EventHandler:
         self.event = event
         self.function = function
         self.args: Sequence[Any] = args
-        self.kwargs: Dict[str, Any] = kwargs
+        self.kwargs: dict[str, Any] = kwargs
 
 
 class OutputHandler:

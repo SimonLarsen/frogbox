@@ -1,13 +1,5 @@
-from typing import (
-    Dict,
-    Any,
-    Optional,
-    Mapping,
-    Sequence,
-    Callable,
-    Tuple,
-    Iterable,
-)
+from typing import Any, Callable
+from collections.abc import Mapping, Sequence, Iterable
 from os import PathLike
 from abc import ABC
 import datetime
@@ -56,15 +48,15 @@ class Pipeline(ABC):
     trainer: Trainer
     evaluator: Evaluator
 
-    _models: Dict[str, torch.nn.Module]
-    _optimizers: Dict[str, Dict[str, torch.optim.Optimizer]]
-    _schedulers: Dict[str, Dict[str, LRScheduler]]
-    _losses: Dict[str, CompositeLoss]
-    _datasets: Dict[str, Dataset]
-    _loaders: Dict[str, DataLoader]
-    _metrics: Dict[str, Metric]
+    _models: dict[str, torch.nn.Module]
+    _optimizers: dict[str, dict[str, torch.optim.Optimizer]]
+    _schedulers: dict[str, dict[str, LRScheduler]]
+    _losses: dict[str, CompositeLoss]
+    _datasets: dict[str, Dataset]
+    _loaders: dict[str, DataLoader]
+    _metrics: dict[str, Metric]
 
-    _run_name: Optional[str] = None
+    _run_name: str | None = None
 
     def __init__(
         self,
@@ -73,8 +65,8 @@ class Pipeline(ABC):
         losses: Mapping[str, Mapping[str, LossDefinition]],
         trainer: TrainerFactory,
         evaluator: EvaluatorFactory,
-        checkpoint: Optional[str | PathLike] = None,
-        checkpoint_keys: Optional[Sequence[str]] = None,
+        checkpoint: str | PathLike | None = None,
+        checkpoint_keys: Sequence[str] | None = None,
     ):
         """Create base pipeline."""
         self.config = config
@@ -202,7 +194,7 @@ class Pipeline(ABC):
         batch_size: int,
         loader_workers: int,
         datasets: Mapping[str, ObjectDefinition],
-        loaders: Optional[Mapping[str, ObjectDefinition]] = None,
+        loaders: Mapping[str, ObjectDefinition] | None = None,
     ):
         if loaders is None:
             loaders = {}
@@ -327,8 +319,8 @@ class Pipeline(ABC):
                 sync_on_compute=False,
             ).to(self.device)
 
-    def _get_checkpoint_dict(self) -> Tuple[Mapping[str, Any], Sequence[str]]:
-        to_save: Dict[str, Any] = {"trainer": self.trainer}
+    def _get_checkpoint_dict(self) -> tuple[Mapping[str, Any], Sequence[str]]:
+        to_save: dict[str, Any] = {"trainer": self.trainer}
         to_unwrap = [f"model_{name}" for name in self._models]
         for name, model in self._models.items():
             to_save[f"model_{name}"] = model
@@ -344,8 +336,8 @@ class Pipeline(ABC):
         self,
         path: str | PathLike,
         to_load: Mapping[str, Any],
-        to_unwrap: Optional[Sequence[str]] = None,
-        keys: Optional[Sequence[str]] = None,
+        to_unwrap: Sequence[str] | None = None,
+        keys: Sequence[str] | None = None,
     ) -> None:
         """
         Load checkpoint from file.

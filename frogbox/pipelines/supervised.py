@@ -1,4 +1,5 @@
-from typing import Optional, Sequence, Mapping, Callable, Any, Tuple, Dict
+from typing import Callable, Any
+from collections.abc import Sequence, Mapping
 from os import PathLike
 import torch
 from .pipeline import Pipeline
@@ -17,8 +18,8 @@ class SupervisedPipeline(Pipeline):
     def __init__(
         self,
         config: SupervisedConfig,
-        checkpoint: Optional[str | PathLike] = None,
-        checkpoint_keys: Optional[Sequence[str]] = None,
+        checkpoint: str | PathLike | None = None,
+        checkpoint_keys: Sequence[str] | None = None,
     ):
         """
         Create supervised pipeline.
@@ -78,8 +79,8 @@ class SupervisedPipeline(Pipeline):
             checkpoint_keys=checkpoint_keys,
         )
 
-    def _get_checkpoint_dict(self) -> Tuple[Mapping[str, Any], Sequence[str]]:
-        to_save: Dict[str, Any] = {
+    def _get_checkpoint_dict(self) -> tuple[Mapping[str, Any], Sequence[str]]:
+        to_save: dict[str, Any] = {
             "trainer": self.trainer,
             "model": self._models["model"],
         }
@@ -95,5 +96,5 @@ class SupervisedPipeline(Pipeline):
         return self._models["model"]
 
     @property
-    def optimizers(self) -> Dict[str, torch.optim.Optimizer]:
+    def optimizers(self) -> dict[str, torch.optim.Optimizer]:
         return self._optimizers["model"]

@@ -1,4 +1,5 @@
-from typing import Sequence, Callable, Any
+from typing import Any, Callable
+from collections.abc import Sequence
 import torch
 from ..engines.engine import Engine
 from ..engines.events import EventStep
@@ -17,7 +18,7 @@ class OptimizerLogger:
         self._log_function = log_function
         if prefix is None:
             prefix = ""
-        self._prefix = prefix
+        self._prefix: str = prefix
 
     def attach(self, engine: Engine) -> None:
         engine.add_event_handler(

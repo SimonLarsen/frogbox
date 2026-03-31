@@ -1,4 +1,5 @@
-from typing import Any, Optional, Sequence, Mapping, Union, TypeAlias
+from typing import Any, TypeAlias
+from collections.abc import Sequence, Mapping
 from os import PathLike
 from enum import Enum
 from pathlib import Path
@@ -74,8 +75,8 @@ class LogInterval(StrictModel):
 
     event: EventStep
     every: int = 1
-    first: Optional[int] = None
-    last: Optional[int] = None
+    first: int | None = None
+    last: int | None = None
 
 
 class CheckpointMode(str, Enum):
@@ -105,11 +106,11 @@ class CheckpointDefinition(StrictModel):
 
     interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
     num_saved: int = Field(default=3, ge=1)
-    metric: Optional[str] = None
+    metric: str | None = None
     mode: CheckpointMode = CheckpointMode.MAX
 
 
-ObjectArgument: TypeAlias = Union["ObjectDefinition", Any]
+ObjectArgument: TypeAlias = "ObjectDefinition" | Any
 """Argument that can be passed to an object definition."""
 
 
@@ -202,11 +203,11 @@ class ObjectDefinition(StrictModel):
         validate_by_name=True,
         serialize_by_alias=True,
     )
-    object: Optional[str] = None
-    function: Optional[str] = None
-    lambda_: Optional[str] = Field(default=None, alias="lambda")
-    args: Optional[Sequence[ObjectArgument]] = None
-    kwargs: Optional[Mapping[str, ObjectArgument]] = None
+    object: str | None = None
+    function: str | None = None
+    lambda_: str | None = Field(default=None, alias="lambda")
+    args: Sequence[ObjectArgument] | None = None
+    kwargs: Mapping[str, ObjectArgument] | None = None
 
     @model_validator(mode="after")
     def verify_object_or_function(self) -> "ObjectDefinition":
@@ -300,8 +301,8 @@ class OptimizerDefinition(ObjectDefinition):
     """
 
     object: str = "torch.optim.AdamW"
-    kwargs: Optional[Mapping[str, ObjectArgument]] = {"lr": 1e-3}
-    parameters: Optional[str | ObjectDefinition] = None
+    kwargs: Mapping[str, ObjectArgument] | None = {"lr": 1e-3}
+    parameters: str | ObjectDefinition | None = None
     scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
 
 
@@ -334,7 +335,7 @@ class LossDefinition(ObjectDefinition):
     """
 
     weight: float = 1.0
-    transform: Optional[ObjectDefinition] = None
+    transform: ObjectDefinition | None = None
 
 
 class CallbackDefinition(ObjectDefinition):
@@ -389,7 +390,7 @@ class Config(StrictModel):
 
     type: ConfigType
     project: str
-    tracker: TrackerType
+    tracker: TrackerType = TrackerType.WANDB
     log_interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
     batch_size: int = Field(default=32, ge=1)
     loader_workers: int = Field(default=0, ge=0)
@@ -441,12 +442,12 @@ class SupervisedConfig(Config):
     """
 
     type: ConfigType = Field(default=ConfigType.SUPERVISED, frozen=True)
-    clip_grad_norm: Optional[float] = None
-    clip_grad_value: Optional[float] = None
+    clip_grad_norm: float | None = None
+    clip_grad_value: float | None = None
     model: ModelDefinition
     losses: Mapping[str, LossDefinition] = {}
-    trainer_forward: Optional[ObjectDefinition] = None
-    evaluator_forward: Optional[ObjectDefinition] = None
+    trainer_forward: ObjectDefinition | None = None
+    evaluator_forward: ObjectDefinition | None = None
 
     @field_validator("type")
     @classmethod
@@ -472,8 +473,8 @@ def _guess_config_format(path: str | PathLike) -> str:
 
 def read_config(
     path: str | PathLike,
-    format: Optional[str] = None,
-    config_vars: Optional[Mapping[str, str]] = None,
+    format: str | None = None,
+    config_vars: Mapping[str, str] | None = None,
 ) -> Config:
     """
     Read and render config file using jinja2.

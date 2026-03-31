@@ -1,19 +1,12 @@
-from typing import (
-    Mapping,
-    Any,
-    Callable,
-    Sequence,
-    Optional,
-    List,
-    Dict,
-)
+from typing import Any, Callable
+from collections.abc import Sequence, Mapping
 import os
 import math
 from pathlib import Path
 from collections import namedtuple
 import torch
 from accelerate import Accelerator
-from ..config import Config
+from ..config import Config, CheckpointMode
 
 
 SavedCheckpoint = namedtuple("SavedCheckpoint", ["filename", "priority"])
@@ -54,10 +47,10 @@ class Checkpoint:
         to_save: Mapping[str, Any],
         output_folder: str | os.PathLike,
         global_step_function: Callable[[], int],
-        score_function: Optional[Callable[[], float]] = None,
-        score_name: Optional[str] = None,
-        score_mode: str = "max",
-        to_unwrap: Optional[Sequence[str]] = None,
+        score_function: Callable[[], float] | None = None,
+        score_name: str | None = None,
+        score_mode: CheckpointMode = CheckpointMode.MAX,
+        to_unwrap: Sequence[str] | None = None,
         filename_prefix: str = "checkpoint",
         max_saved: int = 3,
     ):
@@ -77,12 +70,12 @@ class Checkpoint:
             to_unwrap = []
         self._to_unwrap = to_unwrap
 
-        self._saved: List[SavedCheckpoint] = []
+        self._saved: list[SavedCheckpoint] = []
 
     def _get_filename(
         self,
-        step: Optional[int],
-        score: Optional[float],
+        step: int | None,
+        score: float | None,
     ) -> str:
         name = str(Path(self._output_folder) / self._filename_prefix)
 
@@ -164,7 +157,7 @@ class Checkpoint:
         accelerator: Accelerator,
         path: str | os.PathLike,
         to_load: Mapping[str, Any],
-        to_unwrap: Optional[Sequence[str]] = None,
+        to_unwrap: Sequence[str] | None = None,
     ) -> None:
         if to_unwrap is None:
             to_unwrap = []
@@ -187,7 +180,7 @@ class Checkpoint:
             else:
                 obj.load_state_dict(ckpt[key])
 
-    def state_dict(self) -> Dict[str, Any]:
+    def state_dict(self) -> dict[str, Any]:
         saved = list(map(tuple, self._saved))
         return dict(saved=saved)
 

@@ -1,11 +1,12 @@
-from typing import Callable, Any, Optional, Tuple, Mapping
+from typing import Callable, Any
+from collections.abc import Mapping
 import torch
 from torch.optim.lr_scheduler import LRScheduler
 from accelerate import Accelerator
 from .engine import Trainer, Evaluator
 
 
-def _default_forward(x: Any, y: Any, model: Callable) -> Tuple[Any, Any]:
+def _default_forward(x: Any, y: Any, model: Callable) -> tuple[Any, Any]:
     return y, model(x)
 
 
@@ -16,11 +17,9 @@ class SupervisedTrainer(Trainer):
         optimizers: Mapping[str, torch.optim.Optimizer],
         schedulers: Mapping[str, LRScheduler],
         loss_fn: Callable[[Any, Any], Any],
-        forward: Optional[
-            Callable[[Any, Any, Callable], Tuple[Any, Any]]
-        ] = None,
-        clip_grad_norm: Optional[float] = None,
-        clip_grad_value: Optional[float] = None,
+        forward: Callable[[Any, Any, Callable], tuple[Any, Any]] | None = None,
+        clip_grad_norm: float | None = None,
+        clip_grad_value: float | None = None,
     ):
         if forward is None:
             forward = _default_forward
@@ -39,7 +38,7 @@ class SupervisedTrainer(Trainer):
     def process(
         self,
         accelerator: Accelerator,
-        batch: Tuple[Any, Any],
+        batch: tuple[Any, Any],
     ):
         self.model.train()
 
@@ -79,9 +78,7 @@ class SupervisedEvaluator(Evaluator):
     def __init__(
         self,
         model: torch.nn.Module,
-        forward: Optional[
-            Callable[[Any, Any, Callable], Tuple[Any, Any]]
-        ] = None,
+        forward: Callable[[Any, Any, Callable], tuple[Any, Any]] | None = None,
     ):
         if forward is None:
             forward = _default_forward
@@ -94,7 +91,7 @@ class SupervisedEvaluator(Evaluator):
     def process(
         self,
         accelerator: Accelerator,
-        batch: Tuple[Any, Any],
+        batch: tuple[Any, Any],
     ):
         self.model.eval()
 
