@@ -11,7 +11,8 @@ def _validate_vars(ctx, param, values) -> dict[str, str]:
     out: dict[str, str] = {}
     for value in values:
         pos = value.find("=")
-        assert pos >= 1
+        if pos <= 0 or pos == len(value) - 1:
+            raise ValueError("Config variables should have format key=value.")
         out[value[:pos]] = value[pos + 1 :]
     return out
 
