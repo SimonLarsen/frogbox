@@ -1,4 +1,4 @@
-{% set batch_size = batch_size | default(32) -%}
+# {% set batch_size = batch_size | default(32) %}
 type: supervised
 project: frogbox-example
 tracker: wandb

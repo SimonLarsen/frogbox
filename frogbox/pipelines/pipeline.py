@@ -67,6 +67,7 @@ class Pipeline(ABC):
         evaluator: EvaluatorFactory,
         checkpoint: str | PathLike | None = None,
         checkpoint_keys: Sequence[str] | None = None,
+        tracker_kwargs: Mapping[str, Any] | None = None,
     ):
         """Create base pipeline."""
         self.config = config
@@ -77,20 +78,9 @@ class Pipeline(ABC):
             log_with=config.tracker,
         )
 
-        if config.tracker == TrackerType.MLFLOW:
-            import mlflow.config
-
-            mlflow.config.enable_system_metrics_logging()
-            mlflow.config.enable_async_logging(True)
-
-        self.accelerator.init_trackers(
-            project_name=self.config.project,
-            config=self.config.model_dump(),
-            init_kwargs={
-                "wandb": {"name": self.run_name},
-                "mlflow": {"run_name": self.run_name}
-            },
-        )
+        if tracker_kwargs is None:
+            tracker_kwargs = {}
+        self._setup_tracker(tracker_kwargs)
 
         self._create_data_loaders(
             batch_size=config.batch_size,
@@ -188,6 +178,25 @@ class Pipeline(ABC):
                 callback=create_object_from_config(cfg),
                 engine=cfg.engine,
             )
+
+    def _setup_tracker(self, kwargs: Mapping[str, Any]):
+        init_kwargs = dict(kwargs)
+
+        if self.config.tracker == TrackerType.WANDB:
+            init_kwargs["name"] = self.run_name
+
+        elif self.config.tracker == TrackerType.MLFLOW:
+            import mlflow.config
+
+            mlflow.config.enable_system_metrics_logging()
+            mlflow.config.enable_async_logging(True)
+            init_kwargs["run_name"] = self.run_name
+
+        self.accelerator.init_trackers(
+            project_name=self.config.project,
+            config=self.config.model_dump(),
+            init_kwargs={self.config.tracker.value: init_kwargs},
+        )
 
     def _create_data_loaders(
         self,
@@ -415,7 +424,7 @@ class Pipeline(ABC):
 
     def log(self, data: Mapping[str, Any]) -> None:
         """Log data to tracker(s)."""
-        self.accelerator.log(data, step=self.trainer.iteration)
+        self.accelerator.log(dict(data), step=self.trainer.iteration)
 
     def log_images(self, key: str, images: Sequence[Image.Image]) -> None:
         step = self.trainer.iteration

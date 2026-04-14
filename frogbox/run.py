@@ -65,16 +65,29 @@ def _validate_checkpoint_keys(ctx, param, values: Sequence[str]) -> list[str]:
     callback=_validate_vars,
     help="Set config parser variable.",
 )
+@click.option(
+    "--tracker_var",
+    "-t",
+    "tracker_vars",
+    type=str,
+    multiple=True,
+    callback=_validate_vars,
+    help="Set tracker keyword arguments."
+)
 def run(
     config: Path,
     config_format: str | None = None,
     checkpoint: Path | None = None,
     checkpoint_keys: Sequence[str] | None = None,
     config_vars: Mapping[str, str] | None = None,
+    tracker_vars: Mapping[str, str] | None = None,
     **kwargs,
 ) -> Pipeline:
     if config_vars is None:
         config_vars = {}
+
+    if tracker_vars is None:
+        tracker_vars = {}
 
     if checkpoint_keys is not None and len(checkpoint_keys) == 0:
         checkpoint_keys = None
@@ -91,6 +104,7 @@ def run(
             config=cfg,
             checkpoint=checkpoint,
             checkpoint_keys=checkpoint_keys,
+            tracker_kwargs=tracker_vars,
             **kwargs,
         )
     else:
