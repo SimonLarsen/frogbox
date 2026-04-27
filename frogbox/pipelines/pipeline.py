@@ -67,7 +67,6 @@ class Pipeline(ABC):
         evaluator: EvaluatorFactory,
         checkpoint: str | PathLike | None = None,
         checkpoint_keys: Sequence[str] | None = None,
-        tracker_kwargs: Mapping[str, Any] | None = None,
     ):
         """Create base pipeline."""
         self.config = config
@@ -78,9 +77,7 @@ class Pipeline(ABC):
             log_with=config.tracker,
         )
 
-        if tracker_kwargs is None:
-            tracker_kwargs = {}
-        self._setup_tracker(tracker_kwargs)
+        self._setup_tracker()
 
         self._create_data_loaders(
             batch_size=config.batch_size,
@@ -179,8 +176,11 @@ class Pipeline(ABC):
                 engine=cfg.engine,
             )
 
-    def _setup_tracker(self, kwargs: Mapping[str, Any]):
-        init_kwargs = dict(kwargs)
+    def _setup_tracker(self):
+        if self.config.tracker_kwargs is not None:
+            init_kwargs = dict(self.config.tracker_kwargs)
+        else:
+            init_kwargs = {}
 
         if self.config.tracker == TrackerType.WANDB:
             init_kwargs["name"] = self.run_name

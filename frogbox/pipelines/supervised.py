@@ -20,7 +20,6 @@ class SupervisedPipeline(Pipeline):
         config: SupervisedConfig,
         checkpoint: str | PathLike | None = None,
         checkpoint_keys: Sequence[str] | None = None,
-        tracker_kwargs: Mapping[str, Any] | None = None,
     ):
         """
         Create supervised pipeline.
@@ -34,8 +33,6 @@ class SupervisedPipeline(Pipeline):
         checkpoint_keys : list of str
             List of keys for objects to load from checkpoint.
             Defaults to all keys.
-        tracker_kwargs
-            Keyword arguments to pass to tracker.
         """
 
         def trainer_factory(
@@ -80,7 +77,6 @@ class SupervisedPipeline(Pipeline):
             evaluator=evaluator_factory,
             checkpoint=checkpoint,
             checkpoint_keys=checkpoint_keys,
-            tracker_kwargs=tracker_kwargs,
         )
 
     def _get_checkpoint_dict(self) -> tuple[Mapping[str, Any], Sequence[str]]:

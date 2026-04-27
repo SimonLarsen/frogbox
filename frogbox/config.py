@@ -366,6 +366,8 @@ class Config(StrictModel):
         Project name.
     tracker
         Tracker to use for logging.
+    tracker_kwargs
+        Keyword-argument to pass to tracker during initialization.
     log_interval
         At which interval to log metrics.
     batch_size
@@ -391,6 +393,7 @@ class Config(StrictModel):
     type: ConfigType
     project: str
     tracker: TrackerType = TrackerType.WANDB
+    tracker_kwargs: Mapping[str, ObjectArgument] | None = None
     log_interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
     batch_size: int = Field(default=32, ge=1)
     loader_workers: int = Field(default=0, ge=0)
