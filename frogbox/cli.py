@@ -1,5 +1,4 @@
 from pathlib import Path
-import importlib.resources
 import click
 
 
@@ -11,18 +10,18 @@ def cli():
 
 
 @cli.group()
-def project():
-    """Manage project."""
+def config():
+    """Manage configuration files."""
 
 
-@project.command(name="new")
+@config.command(name="new")
 @click.option(
     "--type",
     "-t",
     "type_",
     type=click.Choice(["supervised"]),
     default="supervised",
-    help="Pipeline type.",
+    help="Pipeline type",
 )
 @click.option(
     "--format",
@@ -33,83 +32,51 @@ def project():
     help="Config file format.",
 )
 @click.option(
-    "--dir",
-    "-d",
-    "dir_",
+    "--output",
+    "-o",
     type=click.Path(
         exists=False,
-        file_okay=False,
-        dir_okay=True,
+        file_okay=True,
+        dir_okay=False,
         path_type=Path,
     ),
-    default=Path("."),
-    help="Project root directory.",
+    help="Save config to path.",
 )
-@click.option(
-    "--overwrite",
-    is_flag=True,
-    help="Overwrite existing files if present.",
-)
-def new_project(type_: str, format_: str, dir_: Path, overwrite: bool = False):
-    """Create a new project from template."""
+def new_config(type_: str, format_: str, output: Path):
     import json
     from .config import (
-        ConfigType,
         SupervisedConfig,
         ObjectDefinition,
         ModelDefinition,
     )
 
-    template_inputs = [
-        "model.py",
-        "dataset.py",
-    ]
-
-    template_outputs = [
-        dir_ / "models" / "example.py",
-        dir_ / "datasets" / "example.py",
-    ]
-
-    overwrite_checks = template_outputs + [dir_ / "configs" / "example.json"]
-
-    # Check if files already exist
-    if not overwrite:
-        for path in overwrite_checks:
-            if path.exists():
-                raise RuntimeError(
-                    f"File '{path}' already exists." +
-                    " Use flag --overwrite to overwrite."
-                )
-
-    # Create folders and copy template files
-    resource_files = importlib.resources.files("frogbox.data")
-    for input_resource, output_path in zip(template_inputs, template_outputs):
-        file_data = resource_files.joinpath(input_resource).read_text()
-        output_path.parent.mkdir(exist_ok=True, parents=True)
-        output_path.write_text(file_data)
-
-    # Create config template
-    example_model = ModelDefinition(
-        object="models.example.ExampleModel",
-    )
-    example_dataset = ObjectDefinition(
-        object="datasets.example.ExampleDataset"
-    )
-
     if type_ == "supervised":
-        cfg = SupervisedConfig(
-            type=ConfigType.SUPERVISED,
+        config = SupervisedConfig(
             project="example",
-            model=example_model,
             datasets={
-                "train": example_dataset,
-                "val": example_dataset,
+                "train": ObjectDefinition(
+                    object="datasets.example.ExampleDataset",
+                    kwargs={},
+                ),
+            },
+            model=ModelDefinition(
+                object="models.example.ExampleModel",
+                kwargs={},
+            ),
+        )
+
+        cfg_json = config.model_dump_json(
+            indent=2,
+            exclude_none=True,
+            exclude={
+                "loaders": True,
+                "callbacks": True,
+                "checkpoints": {"__all__": {"mode": True}},
             },
         )
     else:
-        raise RuntimeError(f"Unknown pipeline type {type_}.")
+        raise ValueError(f"Unknown pipeline type {type_}.")
 
-    cfg_json = cfg.model_dump_json(indent=4, exclude_none=True)
     if format_ == "yaml":
         import yaml
 
@@ -119,15 +86,15 @@ def new_project(type_: str, format_: str, dir_: Path, overwrite: bool = False):
             allow_unicode=True,
             default_flow_style=False,
         )
-        output_path = dir_ / "configs" / "example.yaml"
     elif format_ == "json":
         cfg_data = cfg_json
-        output_path = dir_ / "configs" / "example.json"
     else:
         raise ValueError(f"Unknown file format \"{format_}\".")
 
-    output_path.parent.mkdir(exist_ok=True, parents=True)
-    output_path.write_text(cfg_data)
+    if output is not None:
+        output.write_text(cfg_data)
+    else:
+        print(cfg_data)
 
 
 if __name__ == "__main__":
