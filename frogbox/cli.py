@@ -42,13 +42,16 @@ def config():
     ),
     help="Save config to path.",
 )
-def new_config(type_: str, format_: str, output: Path):
+def new_config(type_: str, format_: str, output: Path | None):
     import json
     from .config import (
         SupervisedConfig,
         ObjectDefinition,
         ModelDefinition,
     )
+
+    if output is not None and output.exists():
+        click.confirm(f"Overwrite file at '{output}'?", abort=True)
 
     if type_ == "supervised":
         config = SupervisedConfig(
