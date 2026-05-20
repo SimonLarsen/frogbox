@@ -28,9 +28,20 @@ Issues = "https://github.com/SimonLarsen/frogbox/issues"
 [project.scripts]
 frogbox = "frogbox.cli:cli"
 
-[tool.setuptools.dynamic]
-version = {attr = "frogbox.__version__"}
-
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "frogbox.__version__"}
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+
+[too.ruff.format]
+quote-style = "double"
+indent-style = "space"
