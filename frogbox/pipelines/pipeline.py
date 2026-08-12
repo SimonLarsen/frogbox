@@ -491,4 +491,9 @@ class Pipeline(ABC):
 
     @property
     def max_iterations(self) -> int:
-        return len(self._loaders["train"]) * self.config.max_epochs
+        mult = 1 if self.accelerator.split_batches else self.accelerator.num_processes
+        return (
+            len(self._loaders["train"])
+            * self.config.max_epochs
+            * mult
+        )
