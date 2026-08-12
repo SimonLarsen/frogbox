@@ -22,7 +22,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-wandb = ["wandb>=0.27.0"]
+wandb = ["wandb>=0.28.0"]
+mlflow = ["mlflow>=3.15.1"]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.0",
+    "pytest>=9.1.1",
+    "ruff>=0.16.2",
+]
 
 [project.urls]
 Homepage = "https://github.com/SimonLarsen/frogbox"
@@ -44,12 +52,24 @@ typeCheckingMode = "standard"
 [tool.ruff]
 line-length = 88
 indent-width = 4
+target-version = "py310"
 
-[too.ruff.format]
+[tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
-[dependency-groups]
-dev = [
-    "wandb>=0.28.2",
+[tool.mypy]
+python_version = "3.10"
+plugins = "pydantic.mypy"
+
+[[tool.mypy.overrides]]
+module = [
+    "yaml",
+    "accelerate.*",
+    "torchvision.*",
+    "tqdm",
+    "mlflow.*"
 ]
+ignore_missing_imports = true
