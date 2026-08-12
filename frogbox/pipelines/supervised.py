@@ -1,11 +1,13 @@
-from typing import Callable, Any
-from collections.abc import Sequence, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from os import PathLike
+from typing import Any
+
 import torch
-from .pipeline import Pipeline
+
 from ..config import SupervisedConfig, create_object_from_config
-from ..engines.engine import Trainer, Evaluator
-from ..engines.supervised import SupervisedTrainer, SupervisedEvaluator
+from ..engines.engine import Evaluator, Trainer
+from ..engines.supervised import SupervisedEvaluator, SupervisedTrainer
+from .pipeline import Pipeline
 
 
 class SupervisedPipeline(Pipeline):
@@ -57,9 +59,7 @@ class SupervisedPipeline(Pipeline):
                 clip_grad_value=config.clip_grad_value,
             )
 
-        def evaluator_factory(
-            models: Mapping[str, torch.nn.Module]
-        ) -> Evaluator:
+        def evaluator_factory(models: Mapping[str, torch.nn.Module]) -> Evaluator:
             return SupervisedEvaluator(
                 model=models["model"],
                 forward=(

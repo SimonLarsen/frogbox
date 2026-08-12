@@ -1,6 +1,8 @@
-from typing import Callable, Any
-from ..engines.events import EventStep
+from collections.abc import Callable
+from typing import Any
+
 from ..engines.engine import Engine
+from ..engines.events import EventStep
 from ..pipelines.composite_loss import CompositeLoss
 
 

@@ -1,19 +1,20 @@
-from typing import Any, Callable
-from collections.abc import Sequence, Mapping
-import os
 import math
-from pathlib import Path
+import os
 from collections import namedtuple
+from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
+from typing import Any
+
 import torch
 from accelerate import Accelerator
-from ..config import Config, CheckpointMode
 
+from ..config import CheckpointMode, Config
 
 SavedCheckpoint = namedtuple("SavedCheckpoint", ["filename", "priority"])
 
 
 def _fix_compiled_model_keys(
-    state_dict: Mapping[str, torch.Tensor]
+    state_dict: Mapping[str, torch.Tensor],
 ) -> Mapping[str, torch.Tensor]:
     fixed = {}
     for key, value in state_dict.items():
@@ -26,16 +27,9 @@ def _map_state_dict_to_compiled_model(
     state_dict: Mapping[str, torch.Tensor],
     model: torch.nn.Module,
 ) -> Mapping[str, torch.Tensor]:
-    key_map = {
-        key.replace("_orig_mod.", ""): key
-        for key in model.state_dict().keys()
-    }
+    key_map = {key.replace("_orig_mod.", ""): key for key in model.state_dict()}
 
-    fixed = {
-        key_map[key]: value
-        for key, value
-        in state_dict.items()
-    }
+    fixed = {key_map[key]: value for key, value in state_dict.items()}
     return fixed
 
 
@@ -188,7 +182,7 @@ class Checkpoint:
 
     def state_dict(self) -> dict[str, Any]:
         saved = list(map(tuple, self._saved))
-        return dict(saved=saved)
+        return {"saved": saved}
 
     def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
         self._saved = [SavedCheckpoint(*e) for e in state_dict["saved"]]

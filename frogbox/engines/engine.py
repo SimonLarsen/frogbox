@@ -1,18 +1,18 @@
-from typing import Callable, Protocol, Any
-from collections.abc import Mapping, Sequence, Iterator
-import tqdm
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from typing import Any, Protocol
+
 import torch
+import tqdm
 from accelerate import Accelerator
-from .events import EventStep, MatchableEvent, Event
+
 from ..pipelines.composite_loss import CompositeLoss
+from .events import Event, EventStep, MatchableEvent
 
 
 class SizedIterable(Protocol):
-    def __len__(self) -> int:
-        ...
+    def __len__(self) -> int: ...
 
-    def __iter__(self) -> Iterator:
-        ...
+    def __iter__(self) -> Iterator: ...
 
 
 class Engine:
@@ -50,7 +50,7 @@ class Engine:
     def _get_progress_label(self, prefix: str | None = None) -> str:
         label = ""
         if self.max_epochs > 1:
-            label += f"[{self.epoch+1}/{self.max_epochs}]"
+            label += f"[{self.epoch + 1}/{self.max_epochs}]"
         if prefix is not None and len(prefix) > 0:
             label = prefix + " " + label
         return label
@@ -88,9 +88,7 @@ class Engine:
     ):
         if isinstance(event, (str, EventStep)):
             event = Event(event)
-        self.event_handlers.append(
-            EventHandler(event, function, *args, **kwargs)
-        )
+        self.event_handlers.append(EventHandler(event, function, *args, **kwargs))
 
     def add_output_handler(
         self,
@@ -144,22 +142,20 @@ class Engine:
         self._fire_event(EventStep.COMPLETED)
 
     def state_dict(self) -> dict[str, Any]:
-        return dict(
-            epoch=self.epoch,
-            iteration=self.iteration,
-        )
+        return {
+            "epoch": self.epoch,
+            "iteration": self.iteration,
+        }
 
     def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
         self.epoch = state_dict["epoch"]
         self.iteration = state_dict["iteration"]
 
 
-class Trainer(Engine):
-    ...
+class Trainer(Engine): ...
 
 
-class Evaluator(Engine):
-    ...
+class Evaluator(Engine): ...
 
 
 class TrainerFactory(Protocol):
@@ -167,20 +163,16 @@ class TrainerFactory(Protocol):
         self,
         models: Mapping[str, torch.nn.Module],
         optimizers: Mapping[str, Mapping[str, torch.optim.Optimizer]],
-        schedulers: Mapping[
-            str, Mapping[str, torch.optim.lr_scheduler.LRScheduler]
-        ],
+        schedulers: Mapping[str, Mapping[str, torch.optim.lr_scheduler.LRScheduler]],
         losses: Mapping[str, CompositeLoss],
-    ) -> Trainer:
-        ...
+    ) -> Trainer: ...
 
 
 class EvaluatorFactory(Protocol):
     def __call__(
         self,
         models: Mapping[str, torch.nn.Module],
-    ) -> Evaluator:
-        ...
+    ) -> Evaluator: ...
 
 
 class EventHandler:

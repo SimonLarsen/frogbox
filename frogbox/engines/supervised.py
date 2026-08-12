@@ -1,9 +1,11 @@
-from typing import Callable, Any
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from typing import Any
+
 import torch
-from torch.optim.lr_scheduler import LRScheduler
 from accelerate import Accelerator
-from .engine import Trainer, Evaluator
+from torch.optim.lr_scheduler import LRScheduler
+
+from .engine import Evaluator, Trainer
 
 
 def _default_forward(x: Any, y: Any, model: Callable) -> tuple[Any, Any]:

@@ -1,5 +1,6 @@
-from typing import cast, Any, Callable
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, cast
+
 import torch
 
 
@@ -35,9 +36,7 @@ def apply_to_tensor(x: Any, function: Callable) -> Any:
         return cast(Callable, type(x))(
             [apply_to_tensor(sample, function) for sample in x]
         )
-    raise TypeError(
-        (f"x must contain tensors, dicts or lists; found {type(x)}")
-    )
+    raise TypeError(f"x must contain tensors, dicts or lists; found {type(x)}")
 
 
 def convert_tensor(

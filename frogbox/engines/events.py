@@ -21,6 +21,7 @@ class EventStep(str, Enum):
     COMPLETED : str
         Engine run completed.
     """
+
     STARTED = "started"
     EPOCH_STARTED = "epoch_started"
     ITERATION_STARTED = "iteration_started"
@@ -31,6 +32,7 @@ class EventStep(str, Enum):
 
 class MatchableEvent(ABC):
     """Base class for events that can be matched against."""
+
     @abstractmethod
     def matches(self, event: EventStep, step: int) -> bool:
         """Check if event matches specific event step iteration."""

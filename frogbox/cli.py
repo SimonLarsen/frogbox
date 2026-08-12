@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import click
 
 
@@ -44,10 +45,11 @@ def config():
 )
 def new_config(type_: str, format_: str, output: Path | None):
     import json
+
     from .config import (
-        SupervisedConfig,
-        ObjectDefinition,
         ModelDefinition,
+        ObjectDefinition,
+        SupervisedConfig,
     )
 
     if output is not None and output.exists():
@@ -92,7 +94,7 @@ def new_config(type_: str, format_: str, output: Path | None):
     elif format_ == "json":
         cfg_data = cfg_json
     else:
-        raise ValueError(f"Unknown file format \"{format_}\".")
+        raise ValueError(f'Unknown file format "{format_}".')
 
     if output is not None:
         output.write_text(cfg_data)

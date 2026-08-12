@@ -1,6 +1,8 @@
-from typing import Callable, Any
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from typing import Any
+
 from torchmetrics import Metric
+
 from ..engines.engine import Engine
 from ..engines.events import EventStep
 

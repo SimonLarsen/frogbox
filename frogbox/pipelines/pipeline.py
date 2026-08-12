@@ -1,43 +1,45 @@
-from typing import cast, Any, Callable
-from collections.abc import Mapping, Sequence, Iterable
-from os import PathLike
-from abc import ABC
 import datetime
-import warnings
 import re
+import warnings
+from abc import ABC
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from functools import partial
-from PIL import Image
+from os import PathLike
+from typing import Any, cast
+
 import torch
-from torch.utils.data import Dataset, DataLoader
-from torch.optim.lr_scheduler import LRScheduler
 from accelerate import Accelerator
-from accelerate.tracking import WandBTracker, MLflowTracker
+from accelerate.tracking import MLflowTracker, WandBTracker
+from PIL import Image
+from torch.optim.lr_scheduler import LRScheduler
+from torch.utils.data import DataLoader, Dataset
 from torchmetrics import Metric
-from .name_generation import generate_name
-from ..engines.engine import (
-    Engine,
-    Trainer,
-    Evaluator,
-    TrainerFactory,
-    EvaluatorFactory,
-)
-from ..engines.events import MatchableEvent
+
 from ..config import (
     Config,
-    ObjectDefinition,
-    ModelDefinition,
-    OptimizerDefinition,
     LossDefinition,
+    ModelDefinition,
+    ObjectDefinition,
+    OptimizerDefinition,
     TrackerType,
-    parse_log_interval,
     create_object_from_config,
+    parse_log_interval,
 )
-from .composite_loss import CompositeLoss
-from .lr_scheduler import create_lr_scheduler
+from ..engines.engine import (
+    Engine,
+    Evaluator,
+    EvaluatorFactory,
+    Trainer,
+    TrainerFactory,
+)
+from ..engines.events import MatchableEvent
 from ..handlers.checkpoint import Checkpoint
 from ..handlers.composite_loss_logger import CompositeLossLogger
-from ..handlers.optimizer_logger import OptimizerLogger
 from ..handlers.metric_logger import MetricLogger
+from ..handlers.optimizer_logger import OptimizerLogger
+from .composite_loss import CompositeLoss
+from .lr_scheduler import create_lr_scheduler
+from .name_generation import generate_name
 
 
 class Pipeline(ABC):
@@ -212,7 +214,7 @@ class Pipeline(ABC):
         self._loaders = {}
 
         with self.accelerator.local_main_process_first():
-            for split in datasets.keys():
+            for split in datasets:
                 ds = create_object_from_config(datasets[split])
                 self._datasets[split] = ds
 
@@ -257,9 +259,7 @@ class Pipeline(ABC):
                     max_iterations=self.max_iterations,
                 )
 
-                optimizer, scheduler = self.accelerator.prepare(
-                    optimizer, scheduler
-                )
+                optimizer, scheduler = self.accelerator.prepare(optimizer, scheduler)
                 self._optimizers[model_name][optimizer_name] = optimizer
                 self._schedulers[model_name][optimizer_name] = scheduler
 
@@ -271,10 +271,7 @@ class Pipeline(ABC):
         params: Iterable[torch.nn.Parameter]
         if isinstance(config.parameters, str):
             regex = re.compile(config.parameters)
-            params = [
-                m for n, m in model.named_parameters()
-                if regex.match(n)
-            ]
+            params = [m for n, m in model.named_parameters() if regex.match(n)]
         elif isinstance(config.parameters, ObjectDefinition):
             get_params = create_object_from_config(config.parameters)
             params = get_params(model)
@@ -283,9 +280,7 @@ class Pipeline(ABC):
 
         return create_object_from_config(config, params=params)
 
-    def _create_losses(
-        self, losses: Mapping[str, Mapping[str, LossDefinition]]
-    ):
+    def _create_losses(self, losses: Mapping[str, Mapping[str, LossDefinition]]):
         self._losses = {}
         for name, cfg in losses.items():
             self._losses[name] = self._create_composite_loss(cfg)
@@ -303,9 +298,7 @@ class Pipeline(ABC):
             losses.append(create_object_from_config(loss_cfg))
             weights.append(loss_cfg.weight)
             if loss_cfg.transform is not None:
-                transforms.append(
-                    create_object_from_config(loss_cfg.transform)
-                )
+                transforms.append(create_object_from_config(loss_cfg.transform))
             else:
                 transforms.append(None)
 
@@ -434,18 +427,15 @@ class Pipeline(ABC):
 
             elif isinstance(tracker, MLflowTracker):
                 if len(images) != 1:
-                    raise RuntimeError(
-                        "MLFlow only supports logging single images."
-                    )
+                    raise RuntimeError("MLFlow only supports logging single images.")
 
                 import mlflow
 
                 mlflow.log_image(images[0], key=key, step=step)
 
             else:
-                raise RuntimeError(
-                    "log_images is not supported for" +
-                    tracker.__class__.__name__
+                raise TypeError(
+                    "log_images is not supported for" + tracker.__class__.__name__
                 )
 
     def print(self, *args, **kwargs) -> None:
@@ -459,10 +449,8 @@ class Pipeline(ABC):
         inputs and targets for metric calculation.
 
         Wrapper around [`Accelerator.gather_for_metrics`](https://huggingface.co/docs/accelerate/main/en/package_reference/accelerator#accelerate.Accelerator.gather_for_metrics).
-        """  # noqa: E501, W505
-        return self.accelerator.gather_for_metrics(
-            input_data, use_gather_object
-        )
+        """
+        return self.accelerator.gather_for_metrics(input_data, use_gather_object)
 
     @property
     def device(self) -> torch.device:

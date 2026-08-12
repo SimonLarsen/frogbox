@@ -1,6 +1,8 @@
-from typing import Any, Callable
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
+
 import torch
+
 from ..engines.engine import Engine
 from ..engines.events import EventStep
 

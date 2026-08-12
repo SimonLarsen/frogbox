@@ -1,12 +1,14 @@
-from typing import Any, TypeAlias, Union
-from collections.abc import Sequence, Mapping
-from os import PathLike
-from enum import Enum
-from pathlib import Path
-from functools import partial
 import json
-import yaml
+from collections.abc import Mapping, Sequence
+from enum import Enum
+from functools import partial
 from importlib import import_module
+from os import PathLike
+from pathlib import Path
+from typing import Any, TypeAlias, Union
+
+import jinja2
+import yaml
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -14,9 +16,8 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-import jinja2
-from .engines.events import EventStep, Event, MatchableEvent
 
+from .engines.events import Event, EventStep, MatchableEvent
 
 _CONFIG_TYPE_EXTENSIONS: Mapping[str, Sequence[str]] = {
     "json": (".js", ".json"),
@@ -212,9 +213,9 @@ class ObjectDefinition(StrictModel):
     @model_validator(mode="after")
     def verify_object_or_function(self) -> "ObjectDefinition":
         num_set = (
-            int(self.object is not None) +
-            int(self.function is not None) +
-            int(self.lambda_ is not None)
+            int(self.object is not None)
+            + int(self.function is not None)
+            + int(self.lambda_ is not None)
         )
         if num_set != 1:
             raise ValueError(
@@ -316,9 +317,7 @@ class ModelDefinition(ObjectDefinition):
         Optimizer definitions.
     """
 
-    optimizers: Mapping[str, OptimizerDefinition] = {
-        "default": OptimizerDefinition()
-    }
+    optimizers: Mapping[str, OptimizerDefinition] = {"default": OptimizerDefinition()}
 
 
 class LossDefinition(ObjectDefinition):

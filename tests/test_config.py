@@ -7,7 +7,7 @@ def test_create_object_from_config():
         kwargs={
             "hours": 2,
             "minutes": 34,
-        }
+        },
     )
     obj = create_object_from_config(obj_def)
     assert obj.seconds == 2 * 60**2 + 34 * 60

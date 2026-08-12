@@ -8,9 +8,11 @@ In this example, we define two callbacks: one that freezes the weights of the mo
 ```python title="callbacks/encoder.py"
 from frogbox import SupervisedPipeline
 
+
 def freeze_encoder(pipeline: SupervisedPipeline):
     model = pipeline.model
     model.encoder.requires_grad_(False)
+
 
 def unfreeze_encoder(pipeline: SupervisedPipeline):
     model = pipeline.model

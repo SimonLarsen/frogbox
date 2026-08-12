@@ -1,12 +1,14 @@
-from typing import cast
 from os import PathLike
 from pathlib import Path
+from typing import cast
+
 import torch
+
 from .config import (
     Config,
     SupervisedConfig,
-    read_config,
     create_object_from_config,
+    read_config,
 )
 
 

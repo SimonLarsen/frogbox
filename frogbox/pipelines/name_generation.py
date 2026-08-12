@@ -1,6 +1,6 @@
 from typing import cast
-import numpy as np
 
+import numpy as np
 
 ADJECTIVES: list[str] = [
     "adorable",

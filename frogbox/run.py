@@ -1,8 +1,10 @@
-from typing import cast
-from collections.abc import Sequence, Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import cast
+
 import click
-from frogbox.config import read_config, SupervisedConfig
+
+from frogbox.config import SupervisedConfig, read_config
 from frogbox.pipelines.pipeline import Pipeline
 from frogbox.pipelines.supervised import SupervisedPipeline
 

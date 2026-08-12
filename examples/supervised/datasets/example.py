@@ -15,9 +15,7 @@ class ExampleDataset(Dataset):
 
         split = split.lower()
         assert split in ("train", "val", "test")
-        self.data = CIFAR10(
-            root="data", train=split == "train", download=download
-        )
+        self.data = CIFAR10(root="data", train=split == "train", download=download)
 
         if split == "val":
             self.data.data = self.data.data[:-32]

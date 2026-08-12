@@ -1,8 +1,8 @@
-from typing import Callable, Any, TypeAlias
-from collections.abc import Sequence
 import inspect
-import torch
+from collections.abc import Callable, Sequence
+from typing import Any, TypeAlias
 
+import torch
 
 LossTransform: TypeAlias = Callable[[Any, Any], Any]
 

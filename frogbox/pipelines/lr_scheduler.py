@@ -1,4 +1,5 @@
 import torch
+
 from ..config import LRSchedulerDefinition, SchedulerType
 
 

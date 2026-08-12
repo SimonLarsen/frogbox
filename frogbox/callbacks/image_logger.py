@@ -1,17 +1,19 @@
-from typing import Callable, Any
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
+
 import torch
+import tqdm
 from torchvision.transforms.functional import (
+    InterpolationMode,
     center_crop,
     resize,
-    InterpolationMode,
     to_pil_image,
 )
 from torchvision.utils import make_grid
-import tqdm
-from .callback import Callback
+
 from ..pipelines.pipeline import Pipeline
 from ..tensor_utils import convert_tensor
+from .callback import Callback
 
 
 def _default_forward(x: Any, y: Any, model: Callable) -> tuple[Any, ...]:
@@ -94,9 +96,7 @@ class ImageLogger(Callback):
 
             outputs = accelerator.gather_for_metrics(outputs)
 
-            outputs = tuple(
-                convert_tensor(e, torch.device("cpu")) for e in outputs
-            )
+            outputs = tuple(convert_tensor(e, torch.device("cpu")) for e in outputs)
             batch_sizes = [len(e) for e in outputs]
             assert all(s == batch_sizes[0] for s in batch_sizes)
             for i in range(batch_sizes[0]):
@@ -106,9 +106,7 @@ class ImageLogger(Callback):
         pil_images = [to_pil_image(image) for image in images]
         pipeline.log_images(self.log_label, pil_images)
 
-    def _combine_test_images(
-        self, images: Sequence[torch.Tensor]
-    ) -> torch.Tensor:
+    def _combine_test_images(self, images: Sequence[torch.Tensor]) -> torch.Tensor:
         for image in images:
             assert len(image.shape) == 3
             assert image.size(0) in (1, 3)
