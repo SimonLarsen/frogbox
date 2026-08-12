@@ -48,3 +48,8 @@ indent-width = 4
 [too.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[dependency-groups]
+dev = [
+    "wandb>=0.28.2",
+]

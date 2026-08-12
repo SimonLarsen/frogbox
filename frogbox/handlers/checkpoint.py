@@ -95,7 +95,7 @@ class Checkpoint:
         self,
         filename: str,
     ) -> None:
-        if not self._accelerator.is_local_main_process:
+        if not self._accelerator.is_main_process:
             return
 
         # Create parent directory if it doesn't exist
@@ -118,6 +118,12 @@ class Checkpoint:
 
         torch.save(state_dicts, filename)
 
+    def _remove_checkpoint(self, filename: str) -> None:
+        if not self._accelerator.is_main_process:
+            return
+
+        os.remove(filename)
+
     def __call__(self) -> None:
         # Compute checkpoint score/priority
         score = None
@@ -139,7 +145,7 @@ class Checkpoint:
             if math.isnan(priority) or priority < min_priority:
                 return
 
-            os.remove(self._saved[min_index].filename)
+            self._remove_checkpoint(self._saved[min_index].filename)
             self._saved.pop(min_index)
 
         # Get output filename

@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import cast, Any, Callable
 from collections.abc import Mapping, Sequence, Iterable
 from os import PathLike
 from abc import ABC
@@ -482,10 +482,19 @@ class Pipeline(ABC):
     def run_name(self) -> str:
         """Get name of current run."""
         if self._run_name is None:
+            # Generate random name
             suffix = generate_name()
             now = datetime.datetime.now(datetime.timezone.utc)
             timestamp = now.strftime("%Y%m%d-%H%M")
-            self._run_name = f"{timestamp}-{suffix}"
+            new_name = f"{timestamp}-{suffix}"
+
+            # Gather names from all nodes and keep first one
+            all_names = self.accelerator.gather_for_metrics(
+                input_data=[new_name],
+                use_gather_object=True,
+            )
+            self._run_name = cast(str, all_names[0])
+
         return self._run_name
 
     @property
