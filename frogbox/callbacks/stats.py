@@ -18,7 +18,7 @@ def print_model_parameters(
     model_key
         Model key to print stats for.
     short_form
-        If true, numbers of be formatted as short form e.g. "23.16 M".
+        If true numbers will be formatted as short form e.g. "23.16 M".
     """
     model = pipe._models[model_key]
     num_params = sum(p.numel() for p in model.parameters())
