@@ -27,9 +27,12 @@ mlflow = ["mlflow>=3.15.1"]
 
 [dependency-groups]
 dev = [
+    "ruff>=0.16.2",
     "mypy>=2.3.0",
     "pytest>=9.1.1",
-    "ruff>=0.16.2",
+    "mkdocs==1.6.1",
+    "mkdocs-material==9.7.7",
+    "mkdocstrings[python]==1.0.6",
 ]
 
 [project.urls]

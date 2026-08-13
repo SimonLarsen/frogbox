@@ -11,9 +11,9 @@ max_epochs: 16
 log_interval: epoch_completed
 
 checkpoints:
-- metric: SSIM
-  mode: max
-  num_saved: 1
+  - metric: SSIM
+    mode: max
+    num_saved: 1
 
 model:
   object: models.upscaler.Upscaler
@@ -63,5 +63,9 @@ metrics:
       data_range: 1.0
 
 callbacks:
-- object: frogbox.callbacks.ImageLogger
-  interval: epoch_completed
+  - interval: started
+    function: frogbox.callbacks.stats.print_model_parameters
+    kwargs:
+
+  - interval: epoch_completed
+    object: frogbox.callbacks.ImageLogger
