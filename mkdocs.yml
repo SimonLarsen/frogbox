@@ -15,7 +15,6 @@ nav:
   - Metrics: guides/metrics.md
   - Callbacks:
     - Custom callbacks: guides/callbacks/custom_callbacks.md
-    - Logging images: guides/callbacks/logging_images.md
   - Loading a trained model: guides/loading_models.md
 
 theme:

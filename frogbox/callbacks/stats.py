@@ -23,7 +23,7 @@ def print_model_parameters(
     model = pipe._models[model_key]
     num_params = sum(p.numel() for p in model.parameters())
 
-    mag = int(floor(log(num_params, 1e3)))
+    mag = floor(log(num_params, 1e3))
     mag = min(mag, len(UNITS) - 1)
 
     if mag > 0 and short_form:

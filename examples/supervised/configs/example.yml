@@ -65,7 +65,6 @@ metrics:
 callbacks:
   - interval: started
     function: frogbox.callbacks.stats.print_model_parameters
-    kwargs:
 
   - interval: epoch_completed
-    object: frogbox.callbacks.ImageLogger
+    function: frogbox.callbacks.image_logger.log_images
