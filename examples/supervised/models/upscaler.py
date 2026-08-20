@@ -1,6 +1,6 @@
 import math
 
-from torch import nn
+from torch import nn, Tensor
 from torch.nn.functional import interpolate
 
 
@@ -9,30 +9,35 @@ class LayerNorm2d(nn.Module):
         super().__init__()
         self.norm = nn.LayerNorm(*args, **kwargs)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         x = x.permute(0, 2, 3, 1)
         x = self.norm(x)
         x = x.permute(0, 3, 1, 2)
         return x
 
 
-class ResidualBlock(nn.Module):
+class ResNetBlock(nn.Module):
     def __init__(self, channels: int):
         super().__init__()
 
         self.act = nn.GELU()
 
-        self.blocks = nn.Sequential(
-            LayerNorm2d(channels),
-            nn.GELU(),
-            nn.Conv2d(channels, channels, 3, 1, 1),
-            LayerNorm2d(channels),
-            nn.GELU(),
-            nn.Conv2d(channels, channels, 3, 1, 1),
-        )
+        self.norm1 = LayerNorm2d(channels)
+        self.conv1 = nn.Conv2d(channels, channels, 3, 1, 1)
 
-    def forward(self, x):
-        return x + self.blocks(x)
+        self.norm2 = LayerNorm2d(channels)
+        self.conv2 = nn.Conv2d(channels, channels, 3, 1, 1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        h = self.norm1(x)
+        h = self.act(h)
+        h = self.conv1(h)
+
+        h = self.norm2(h)
+        h = self.act(h)
+        h = self.conv2(h)
+
+        return x + h
 
 
 class Upsample(nn.Sequential):
@@ -55,7 +60,7 @@ class Upscaler(nn.Module):
 
         self.blocks = nn.ModuleList()
         for _ in range(num_layers):
-            self.blocks.append(ResidualBlock(hidden_channels))
+            self.blocks.append(ResNetBlock(hidden_channels))
 
         self.upsample = nn.ModuleList()
         for _ in range(int(math.log2(scale_factor))):
@@ -68,7 +73,7 @@ class Upscaler(nn.Module):
             nn.Conv2d(hidden_channels, 3, 3, 1, 1),
         )
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         h = self.conv_in(x)
         for block in self.blocks:
             h = block(h)
