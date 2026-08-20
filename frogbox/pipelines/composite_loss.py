@@ -1,10 +1,9 @@
-import inspect
 from collections.abc import Callable, Sequence
 from typing import Any, TypeAlias
 
 import torch
 
-LossTransform: TypeAlias = Callable[[Any, Any], Any]
+LossTransform: TypeAlias = Callable[..., Any]
 
 
 class CompositeLoss(torch.nn.Module):
@@ -32,12 +31,7 @@ class CompositeLoss(torch.nn.Module):
         self.transforms = transforms
         self.last_values = [None] * len(losses)
 
-    def _gather_extra_args(self, loss_fn: torch.nn.Module, kwargs):
-        sig = inspect.signature(loss_fn.forward)
-        args = sig.parameters.keys()
-        return {k: v for k, v in kwargs.items() if k in args}
-
-    def forward(self, input, target, **kwargs):
+    def forward(self, *args):
         """
         Compute loss.
         """
@@ -45,11 +39,9 @@ class CompositeLoss(torch.nn.Module):
         for i, (weight, loss_fn, transform) in enumerate(
             zip(self.weights, self.losses, self.transforms)
         ):
-            args = (input, target)
             if transform is not None:
                 args = transform(*args)
-            extra_args = self._gather_extra_args(loss_fn, kwargs)
-            loss = weight * loss_fn(*args, **extra_args)
+            loss = weight * loss_fn(*args)
             total_loss += loss
             self.last_values[i] = loss.item()
         return total_loss
