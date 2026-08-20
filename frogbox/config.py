@@ -379,6 +379,7 @@ class Config(StrictModel):
     gradient_accumulation_steps : int
         Number of steps the gradients should be accumulated across.
     checkpoints
+        Checkpoint definitions.
     datasets
         Dataset definitions.
     loaders
@@ -435,12 +436,12 @@ class SupervisedConfig(Config):
         Loss functions.
     trainer_forward
         Trainer custom forward function.
-        Should be a function that takes `x`, `y` and `model`
-        and returns `(y_pred, y)`.
+        Should be a function that takes `model` and each output from the data loader and returns what should be passed to the loss function.
+        By default, if the data loader returns `(x, y)` the loss function will receive `(model(x), y)`.
     evaluator_forward
         Evaluator custom forward function.
-        Should be a function that takes `x`, `y` and `model`
-        and returns `(y_pred, y)`.
+        Should be a function that takes `model` and each output from the data loader and returns what should be passed to the metrics.
+        By default, if the data loader returns `(x, y)` the metrics will receive `(model(x), y)`.
     """
 
     type: ConfigType = Field(default=ConfigType.SUPERVISED, frozen=True)

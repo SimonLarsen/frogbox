@@ -18,7 +18,7 @@ class SizedIterable(Protocol):
 class Engine:
     def __init__(
         self,
-        process_fn: Callable[[Accelerator, tuple[Any, Any]], Any],
+        process_fn: Callable[[Accelerator, Sequence[Any]], Any],
     ):
         self.process_fn = process_fn
 

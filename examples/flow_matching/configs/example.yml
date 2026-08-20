@@ -1,0 +1,55 @@
+# {% set batch_size = batch_size | default(32) %}
+type: supervised
+project: frogbox-example
+tracker: wandb
+tracker_kwargs:
+  tags:
+    - flow_matching
+batch_size: {{ batch_size }}
+loader_workers: 4
+max_epochs: 32
+log_interval: epoch_completed
+
+checkpoints:
+  - interval: epoch_completed
+    num_saved: 1
+
+trainer_forward:
+  function: functions.flow_matching.forward
+
+model:
+  object: models.model.FlowMatchingModel
+  kwargs:
+    hidden_dim: 64
+    time_embed_dim: 32
+    num_layers: 10
+
+  optimizers:
+    default:
+      object: torch.optim.AdamW
+      kwargs: 
+        lr: 1.0e-3
+      scheduler:
+        end_value: 1.0e-6
+        type: cosine
+
+datasets:
+  train:
+    object: datasets.example.ExampleDataset
+    kwargs:
+      split: train
+
+losses:
+  MSE:
+    object: torch.nn.MSELoss
+    weight: 1.0
+
+callbacks:
+  - interval: started
+    function: frogbox.callbacks.stats.print_model_parameters
+
+  - interval: epoch_completed
+    function: functions.flow_matching.log_images
+    kwargs:
+      num_timesteps: 20
+      num_images: 8

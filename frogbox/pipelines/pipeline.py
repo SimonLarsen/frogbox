@@ -420,6 +420,7 @@ class Pipeline(ABC):
         self.accelerator.log(dict(data), step=self.trainer.iteration)
 
     def log_images(self, key: str, images: Sequence[Image.Image]) -> None:
+        "Log images to tracker(s)."
         step = self.trainer.iteration
         for tracker in self.accelerator.trackers:
             if isinstance(tracker, WandBTracker):
