@@ -9,7 +9,7 @@ from .engine import Evaluator, Trainer
 
 
 def _default_forward(x: Any, y: Any, model: Callable) -> tuple[Any, Any]:
-    return y, model(x)
+    return model(x), y
 
 
 class SupervisedTrainer(Trainer):
@@ -50,7 +50,7 @@ class SupervisedTrainer(Trainer):
             for optimizer in self.optimizers.values():
                 optimizer.zero_grad()
 
-            y, y_pred = self.forward(x, y, self.model)
+            y_pred, y = self.forward(x, y, self.model)
 
             loss = self.loss_fn(y_pred, y)
             accelerator.backward(loss)
@@ -100,7 +100,7 @@ class SupervisedEvaluator(Evaluator):
         x, y = batch
 
         with torch.no_grad():
-            y, y_pred = self.forward(x, y, self.model)
+            y_pred, y = self.forward(x, y, self.model)
 
         y_pred, y = accelerator.gather_for_metrics((y_pred, y))
         return y_pred, y

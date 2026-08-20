@@ -174,7 +174,7 @@ class ObjectDefinition(StrictModel):
         y_pred = model(x)
         if clamp:
             pred = pred.clamp(0, 1)
-        return y, y_pred
+        return y_pred, y
 
     loss_fn = functools.partial(
         myfun.forward,
@@ -190,11 +190,11 @@ class ObjectDefinition(StrictModel):
 
     ```yaml title="YAML"
     forward:
-        lambda: "x, y, model: (y, model(x))"
+        lambda: "x, y, model: (model(x), y)"
     ```
 
     ```python title="Equivalent Python"
-    forward = lambda: x, y, model: (y, model(x))
+    forward = lambda: x, y, model: (model(x), y)
     ```
 
     </div>
@@ -329,8 +329,8 @@ class LossDefinition(ObjectDefinition):
     weight
         Loss function weight.
     transform
-        Callable that takes in `y_pred` and `y` and outputs what is passed to
-        the loss function.
+        Callable that loss function inputs are passed through before being passed
+        to the loss function.
     """
 
     weight: float = 1.0
@@ -436,11 +436,11 @@ class SupervisedConfig(Config):
     trainer_forward
         Trainer custom forward function.
         Should be function that takes `x`, `y` and `model`
-        and returns `(y, y_pred)`.
+        and returns `(y_pred, y)`.
     evaluator_forward
         Evaluator custom forward function.
         Should be function that takes `x`, `y` and `model`
-        and returns `(y, y_pred)`.
+        and returns `(y_pred, y)`.
     """
 
     type: ConfigType = Field(default=ConfigType.SUPERVISED, frozen=True)
