@@ -39,9 +39,8 @@ class CompositeLoss(torch.nn.Module):
         for i, (weight, loss_fn, transform) in enumerate(
             zip(self.weights, self.losses, self.transforms)
         ):
-            if transform is not None:
-                args = transform(*args)
-            loss = weight * loss_fn(*args)
+            args_t = transform(*args) if transform is not None else args
+            loss = weight * loss_fn(*args_t)
             total_loss += loss
             self.last_values[i] = loss.item()
         return total_loss
