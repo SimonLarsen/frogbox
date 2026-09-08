@@ -9,28 +9,9 @@ import torch
 from accelerate import Accelerator
 
 from ..config import CheckpointMode, Config
+from ..utils import fix_compiled_model_keys, map_state_dict_to_compiled_model
 
 SavedCheckpoint = namedtuple("SavedCheckpoint", ["filename", "priority"])
-
-
-def _fix_compiled_model_keys(
-    state_dict: Mapping[str, torch.Tensor],
-) -> Mapping[str, torch.Tensor]:
-    fixed = {}
-    for key, value in state_dict.items():
-        key = key.replace("_orig_mod.", "")
-        fixed[key] = value
-    return fixed
-
-
-def _map_state_dict_to_compiled_model(
-    state_dict: Mapping[str, torch.Tensor],
-    model: torch.nn.Module,
-) -> Mapping[str, torch.Tensor]:
-    key_map = {key.replace("_orig_mod.", ""): key for key in model.state_dict()}
-
-    fixed = {key_map[key]: value for key, value in state_dict.items()}
-    return fixed
 
 
 class Checkpoint:
@@ -106,7 +87,7 @@ class Checkpoint:
         for key, obj in self._to_save.items():
             if key in self._to_unwrap:
                 obj = self._accelerator.unwrap_model(obj)
-                state_dicts[key] = _fix_compiled_model_keys(obj.state_dict())
+                state_dicts[key] = fix_compiled_model_keys(obj.state_dict())
             else:
                 state_dicts[key] = obj.state_dict()
 
@@ -172,7 +153,7 @@ class Checkpoint:
             if key in to_unwrap:
                 obj = accelerator.unwrap_model(obj)
                 obj.load_state_dict(
-                    _map_state_dict_to_compiled_model(
+                    map_state_dict_to_compiled_model(
                         state_dict=ckpt[key],
                         model=obj,
                     )

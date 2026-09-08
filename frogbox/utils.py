@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from os import PathLike
 from pathlib import Path
 from typing import cast
@@ -45,3 +46,22 @@ def load_model_checkpoint(
         return model, config
     else:
         raise RuntimeError(f"Unsupported config type {base_config.type}.")
+
+
+def fix_compiled_model_keys(
+    state_dict: Mapping[str, torch.Tensor],
+) -> Mapping[str, torch.Tensor]:
+    fixed = {}
+    for key, value in state_dict.items():
+        key = key.replace("_orig_mod.", "")
+        fixed[key] = value
+    return fixed
+
+
+def map_state_dict_to_compiled_model(
+    state_dict: Mapping[str, torch.Tensor],
+    model: torch.nn.Module,
+) -> Mapping[str, torch.Tensor]:
+    key_map = {key.replace("_orig_mod.", ""): key for key in model.state_dict()}
+    fixed = {key_map[key]: value for key, value in state_dict.items()}
+    return fixed
