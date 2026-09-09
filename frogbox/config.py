@@ -98,7 +98,8 @@ class CheckpointDefinition(StrictModel):
     interval : EventStep or LogInterval
         Interval between saving checkpoints.
     num_saved : int
-        Number of checkpoints to save.
+        Maximum number of checkpoints to keep.
+        Older checkpoints will be deleted.
     metric : str
         Name of metric to compare (optional).
     mode : CheckpointMode
@@ -109,6 +110,7 @@ class CheckpointDefinition(StrictModel):
     num_saved: int = Field(default=3, ge=1)
     metric: str | None = None
     mode: CheckpointMode = CheckpointMode.MAX
+    filename_prefix: str = "checkpoint"
 
 
 ObjectArgument: TypeAlias = Union["ObjectDefinition", Any]

@@ -155,6 +155,7 @@ class Pipeline(ABC):
                 score_mode=ckpt_cfg.mode,
                 to_unwrap=to_unwrap,
                 max_saved=ckpt_cfg.num_saved,
+                filename_prefix=ckpt_cfg.filename_prefix,
             )
             self.trainer.add_event_handler(
                 event=parse_log_interval(ckpt_cfg.interval),
