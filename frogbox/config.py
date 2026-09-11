@@ -368,7 +368,7 @@ class Config(StrictModel):
 
     type: ConfigType
     project: str
-    tracker: TrackerType = TrackerType.WANDB
+    tracker: TrackerType | None = None
     tracker_kwargs: Mapping[str, ObjectArgument] | None = None
     log_interval: EventStep | LogInterval = EventStep.EPOCH_COMPLETED
     batch_size: int = Field(default=32, ge=1)

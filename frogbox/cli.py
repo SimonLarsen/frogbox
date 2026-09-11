@@ -52,6 +52,7 @@ def new_config(type_: str, format_: str, output: Path | None):
         ModelDefinition,
         ObjectDefinition,
         SupervisedConfig,
+        TrackerType,
     )
 
     if output is not None and output.exists():
@@ -60,6 +61,7 @@ def new_config(type_: str, format_: str, output: Path | None):
     if type_ == "supervised":
         config = SupervisedConfig(
             project="example",
+            tracker=TrackerType.WANDB,
             datasets={
                 "train": ObjectDefinition(
                     object="datasets.example.ExampleDataset",

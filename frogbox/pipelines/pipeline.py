@@ -179,25 +179,29 @@ class Pipeline(ABC):
             )
 
     def _setup_tracker(self):
-        if self.config.tracker_kwargs is not None:
-            init_kwargs = dict(self.config.tracker_kwargs)
-        else:
-            init_kwargs = {}
+        init_kwargs = {}
 
-        if self.config.tracker == TrackerType.WANDB:
-            init_kwargs["name"] = self.run_name
+        if self.config.tracker is not None:
+            tracker_kwargs = {}
+            if self.config.tracker_kwargs is not None:
+                tracker_kwargs.update(self.config.tracker_kwargs)
 
-        elif self.config.tracker == TrackerType.MLFLOW:
-            import mlflow.config
+            if self.config.tracker == TrackerType.WANDB:
+                tracker_kwargs["name"] = self.run_name
 
-            mlflow.config.enable_system_metrics_logging()
-            mlflow.config.enable_async_logging(True)
-            init_kwargs["run_name"] = self.run_name
+            elif self.config.tracker == TrackerType.MLFLOW:
+                import mlflow.config
+
+                mlflow.config.enable_system_metrics_logging()
+                mlflow.config.enable_async_logging(True)
+                tracker_kwargs["run_name"] = self.run_name
+
+            init_kwargs[self.config.tracker.value] = tracker_kwargs
 
         self.accelerator.init_trackers(
             project_name=self.config.project,
             config=self.config.model_dump(),
-            init_kwargs={self.config.tracker.value: init_kwargs},
+            init_kwargs=init_kwargs,
         )
 
     def _create_data_loaders(
