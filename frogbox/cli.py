@@ -2,6 +2,8 @@ from pathlib import Path
 
 import click
 
+CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+
 
 @click.group()
 def cli():
@@ -15,7 +17,7 @@ def config():
     """Manage configuration files."""
 
 
-@config.command(name="new")
+@config.command(name="new", context_settings=CONTEXT_SETTINGS)
 @click.option(
     "--type",
     "-t",

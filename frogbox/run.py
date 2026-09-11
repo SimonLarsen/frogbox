@@ -8,6 +8,8 @@ from frogbox.config import SupervisedConfig, read_config
 from frogbox.pipelines.pipeline import Pipeline
 from frogbox.pipelines.supervised import SupervisedPipeline
 
+CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+
 
 def _validate_vars(ctx, param, values) -> dict[str, str]:
     out: dict[str, str] = {}
@@ -27,7 +29,7 @@ def _validate_checkpoint_keys(ctx, param, values: Sequence[str]) -> list[str]:
     return out
 
 
-@click.command()
+@click.command(context_settings=CONTEXT_SETTINGS)
 @click.option(
     "--config",
     "-c",
