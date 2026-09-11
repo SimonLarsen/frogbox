@@ -22,14 +22,14 @@ model:
     scale_factor: 2
     hidden_channels: 32
     num_layers: 4
+
   optimizers:
     default:
       object: torch.optim.AdamW
       kwargs: 
         lr: 1.0e-3
       scheduler:
-        end_value: 1.0e-7
-        type: cosine
+        object: frogbox.lr_schedulers.CosineLRScheduler
 
 datasets:
   train:

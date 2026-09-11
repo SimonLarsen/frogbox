@@ -172,10 +172,10 @@ class ObjectDefinition(StrictModel):
 
     ```python title="Equivalent Python"
     # myfun.py
-    def forward(x, y, model, clamp):
+    def forward(model, x, y, clamp):
         y_pred = model(x)
         if clamp:
-            pred = pred.clamp(0, 1)
+            y_pred = y_pred.clamp(0, 1)
         return y_pred, y
 
     loss_fn = functools.partial(
@@ -192,11 +192,11 @@ class ObjectDefinition(StrictModel):
 
     ```yaml title="YAML"
     forward:
-        lambda: "x, y, model: (model(x), y)"
+        lambda: "model, x, y: (model(x), y)"
     ```
 
     ```python title="Equivalent Python"
-    forward = lambda: x, y, model: (model(x), y)
+    forward = lambda: model, x, y: (model(x), y)
     ```
 
     </div>
@@ -225,34 +225,6 @@ class ObjectDefinition(StrictModel):
                 ' "object", "function" and "lambda".'
             )
         return self
-
-
-class SchedulerType(str, Enum):
-    """Parameter scheduler type."""
-
-    LINEAR = "linear"
-    """Linear schedule."""
-    COSINE = "cosine"
-    """Cosine schedule."""
-
-
-class LRSchedulerDefinition(StrictModel):
-    """
-    Learning rate scheduler definition.
-
-    Attributes
-    ----------
-    type : SchedulerType
-        Scheduler type.
-    end_value : float
-        Final learning rate.
-    warmup_stets : int
-        Number of steps to perform warmup. Set to `0` to disable warmup.
-    """
-
-    type: SchedulerType = SchedulerType.COSINE
-    end_value: float = 1e-7
-    warmup_steps: int = Field(default=0, ge=0)
 
 
 class OptimizerDefinition(ObjectDefinition):
@@ -303,10 +275,12 @@ class OptimizerDefinition(ObjectDefinition):
     ```
     """
 
-    object: str = "torch.optim.AdamW"
+    object: str | None = "torch.optim.AdamW"
     kwargs: Mapping[str, ObjectArgument] | None = {"lr": 1e-3}
+    scheduler: ObjectDefinition = ObjectDefinition(
+        object="frogbox.lr_schedulers.CosineLRScheduler",
+    )
     parameters: str | ObjectDefinition | None = None
-    scheduler: LRSchedulerDefinition = LRSchedulerDefinition()
 
 
 class ModelDefinition(ObjectDefinition):

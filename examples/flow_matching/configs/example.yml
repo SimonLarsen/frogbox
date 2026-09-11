@@ -30,8 +30,7 @@ model:
       kwargs: 
         lr: 1.0e-3
       scheduler:
-        end_value: 1.0e-6
-        type: cosine
+        object: frogbox.lr_schedulers.CosineLRScheduler
 
 datasets:
   train:

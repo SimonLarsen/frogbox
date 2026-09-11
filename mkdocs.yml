@@ -12,6 +12,7 @@ nav:
   - Pipelines: reference/pipelines.md
   - Events: reference/events.md
   - Callbacks: reference/callbacks.md
+  - LR schedulers: reference/lr_schedulers.md
 - Guides:
   - Metrics: guides/metrics.md
   - Callbacks:

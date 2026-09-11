@@ -38,7 +38,6 @@ from ..handlers.composite_loss_logger import CompositeLossLogger
 from ..handlers.metric_logger import MetricLogger
 from ..handlers.optimizer_logger import OptimizerLogger
 from .composite_loss import CompositeLoss
-from .lr_scheduler import create_lr_scheduler
 from .name_generation import generate_name
 
 
@@ -254,9 +253,9 @@ class Pipeline(ABC):
             for optimizer_name, optimizer_cfg in model_cfg.optimizers.items():
                 optimizer = self._create_optimizer(optimizer_cfg, model)
 
-                scheduler = create_lr_scheduler(
+                scheduler = create_object_from_config(
+                    optimizer_cfg.scheduler,
                     optimizer=optimizer,
-                    config=optimizer_cfg.scheduler,
                     max_iterations=self.max_iterations,
                 )
 
